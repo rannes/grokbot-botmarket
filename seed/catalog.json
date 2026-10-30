@@ -272,7 +272,7 @@
       "slug": "standup-summarizer",
       "name": "Standup Summarizer",
       "tagline": "Condenses the daily standup channel into a short summary of progress, plans and blockers.",
-      "descriptionMd": "Reads the standup channel each morning and posts a short summary: what got done, what is planned, and who is blocked.\n\nA recipe-based example authored for BotMarket.",
+      "descriptionMd": "Reads the standup channel each weekday morning and shows you a short summary: what got done, what is planned, and who is blocked.\n\nA recipe-based example authored for BotMarket.",
       "category": "operations",
       "tags": [
         "standup",
@@ -316,7 +316,7 @@
             "name": "daily-standup-summary",
             "description": "Summarize the standup every weekday morning.",
             "content": "Run the `summarize-standup` skill and show me the result.",
-            "schedule": "0 9 * * *",
+            "schedule": "0 9 * * 1-5",
             "timezone": "UTC",
             "enabled": false
           }

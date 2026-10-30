@@ -27,12 +27,16 @@ Environment: PORT, HOST, BOTMARKET_DATA_DIR, BOTMARKET_ADMIN_TOKEN, BOTMARKET_RE
 BOTMARKET_SITE_NAME, BOTMARKET_PUBLIC_URL, BOTMARKET_SEED
 `;
 
+const MAX_IMPORT_BYTES = 8 * 1024 * 1024;
+
 async function readSource(src: string): Promise<string> {
   if (/^https?:\/\//i.test(src)) {
     if (!src.toLowerCase().startsWith('https://')) throw new Error('only https URLs are supported');
-    const res = await fetch(src, { signal: AbortSignal.timeout(10_000) });
+    const res = await fetch(src, { signal: AbortSignal.timeout(10_000), redirect: 'error' });
     if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${src}`);
-    return await res.text();
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength > MAX_IMPORT_BYTES) throw new Error('response larger than 8 MB');
+    return new TextDecoder().decode(buf);
   }
   return readFileSync(src, 'utf8');
 }
@@ -48,8 +52,17 @@ export async function runCli(argv: string[], io: CliIO): Promise<number> {
         return 0;
 
       case 'serve': {
-        await startServer(loadConfig(io.env));
-        return -1; // keep running
+        const server = await startServer(loadConfig(io.env));
+        let stopping = false;
+        const stop = (): void => {
+          if (stopping) return;
+          stopping = true;
+          setTimeout(() => process.exit(1), 10_000).unref();
+          server.close().then(() => process.exit(0), () => process.exit(1));
+        };
+        process.once('SIGINT', stop);
+        process.once('SIGTERM', stop);
+        return -1; // sentinel: server is running, main() must not exit
       }
 
       case 'import': {

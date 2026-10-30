@@ -58,4 +58,38 @@ describe('runCli', () => {
     if (!r.ok) throw new Error(r.errors.join('; '));
     expect(r.catalog.bots).toHaveLength(10);
   });
+
+  it('missing arguments exit 2', async () => {
+    for (const c of ['validate', 'import']) {
+      const t = io();
+      expect(await runCli([c], t.io)).toBe(2);
+      expect(t.err.join('')).toContain('missing');
+    }
+  });
+
+  it('unreadable file and non-JSON input exit 1', async () => {
+    const env = { BOTMARKET_DATA_DIR: join(dir, 'data') };
+    const bad = join(dir, 'x.json');
+    writeFileSync(bad, 'not json');
+    for (const argv of [['validate', join(dir, 'nope.json')], ['import', join(dir, 'nope.json')], ['import', bad], ['validate', bad]]) {
+      const t = io(env);
+      expect(await runCli(argv, t.io)).toBe(1);
+      expect(t.err.join('')).not.toBe('');
+    }
+  });
+
+  it('import rejects http URLs', async () => {
+    const t = io({ BOTMARKET_DATA_DIR: join(dir, 'data') });
+    expect(await runCli(['import', 'http://example.com/c.json'], t.io)).toBe(1);
+    expect(t.err.join('')).toContain('https');
+  });
+
+  it('export without a file writes the catalog to stdout', async () => {
+    const env = { BOTMARKET_DATA_DIR: join(dir, 'data') };
+    await runCli(['import', DEFAULT_SEED_PATH], io(env).io);
+    const t = io(env);
+    expect(await runCli(['export'], t.io)).toBe(0);
+    const r = parseCatalog(JSON.parse(t.out.join('')));
+    expect(r.ok && r.catalog.bots.length).toBe(10);
+  });
 });
