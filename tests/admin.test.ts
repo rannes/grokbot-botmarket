@@ -182,4 +182,25 @@ describe("admin", () => {
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("/catalog.json");
   });
+
+  it("rejects forged cookies and wrong bearer tokens", async () => {
+    const a = app();
+    expect((await a.request("/admin")).status).toBe(200);
+    const forged = await a.request(`/admin/bots/${pendingSlug}/approve`, post({ cookie: "bm_admin=deadbeef" }));
+    expect(forged.status).toBe(401);
+    const wrong = await a.request(`/admin/bots/${pendingSlug}/approve`, post({ authorization: "Bearer nope" }));
+    expect(wrong.status).toBe(401);
+    expect(repo.get(pendingSlug)?.status).toBe("pending");
+  });
+
+  it("refuses redirects and surfaces fetch errors on import", async () => {
+    let init: RequestInit | undefined;
+    const f = (async (_u: string, i?: RequestInit) => {
+      init = i;
+      throw new TypeError("redirect mode is set to error");
+    }) as unknown as typeof fetch;
+    const res = await app(TOKEN, f).request("/admin/import", post(cookie(), { url: "https://x.example/c.json" }));
+    expect(res.status).toBe(400);
+    expect(init?.redirect).toBe("error");
+  });
 });

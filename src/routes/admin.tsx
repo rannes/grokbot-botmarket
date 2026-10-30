@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono';
 import { setCookie, deleteCookie } from 'hono/cookie';
-import { ADMIN_COOKIE, hasBearerAdmin, isAdminRequest, signAdminCookie } from '../core/admin-auth.js';
+import { ADMIN_COOKIE, hasBearerAdmin, isAdminRequest, signAdminCookie, verifyAdminToken } from '../core/admin-auth.js';
 import { catalogBotToNewBot, parseCatalog } from '../core/catalog.js';
 import { resolveDeps, type AppDeps } from '../deps.js';
 import type { Bot } from '../db/bots-repo.js';
@@ -11,13 +11,9 @@ import { requestOrigin } from './shared.js';
 const MAX_IMPORT_BYTES = 8 * 1024 * 1024;
 const LIST_LIMIT = 100; // repo.list caps at 100
 
-function safeEqual(a: string, b: string): boolean {
-  return a.length === b.length && Buffer.from(a).equals(Buffer.from(b));
-}
-
 function ActionForm({ slug, action, label, danger }: { slug: string; action: string; label: string; danger?: boolean }) {
   return (
-    <form method="post" action={`/admin/bots/${encodeURIComponent(slug)}/${action}`} style="display:inline">
+    <form method="post" action={`/admin/bots/${encodeURIComponent(slug)}/${action}`}>
       <button type="submit" class={danger ? 'btn btn-danger' : 'btn'}>
         {label}
       </button>
@@ -27,11 +23,11 @@ function ActionForm({ slug, action, label, danger }: { slug: string; action: str
 
 function BotRow({ bot }: { bot: Bot }) {
   return (
-    <li style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;padding:.4rem 0">
+    <li class="admin-row">
       <a href={botPath(bot.slug)}>{bot.name}</a>
       <span class="muted">by {bot.authorName}</span>
       {bot.featured ? <strong>featured</strong> : null}
-      <span style="margin-left:auto">
+      <span class="admin-actions">
         {bot.status === 'pending' ? (
           <ActionForm slug={bot.slug} action="approve" label="Approve" />
         ) : bot.featured ? (
@@ -104,10 +100,12 @@ function Dashboard({
       </section>
       <section>
         <h2>Pending ({pendingCount})</h2>
+        {pendingCount > pending.length ? <p>Showing first {pending.length}.</p> : null}
         {pending.length === 0 ? <p>Nothing waiting for review.</p> : <ul class="admin-list">{pending.map((b) => <BotRow bot={b} />)}</ul>}
       </section>
       <section>
         <h2>Published ({publishedCount})</h2>
+        {publishedCount > published.length ? <p>Showing first {published.length}.</p> : null}
         <ul class="admin-list">{published.map((b) => <BotRow bot={b} />)}</ul>
       </section>
       <section>
@@ -209,7 +207,7 @@ export function adminRoutes(deps: AppDeps, fetchImpl: typeof fetch = fetch): Hon
     const body = await c.req.parseBody();
     const token = typeof body.token === 'string' ? body.token : '';
     const expected = d.config.adminToken as string;
-    if (!safeEqual(token, expected)) {
+    if (!verifyAdminToken(token, expected)) {
       return sendPage(c, <LoginPage siteName={siteName} error="Wrong token." />, 401);
     }
     setCookie(c, ADMIN_COOKIE, signAdminCookie(expected, d.salt), {
@@ -267,6 +265,9 @@ export function adminRoutes(deps: AppDeps, fetchImpl: typeof fetch = fetch): Hon
     try {
       const res = await fetchImpl(parsedUrl.toString(), {
         signal: AbortSignal.timeout(5000),
+        // Redirects are refused so the https-only check cannot be bypassed. Private/loopback hosts are
+        // not blocked: only an authenticated admin can trigger this fetch.
+        redirect: 'error',
         headers: { accept: 'application/json' },
       });
       if (!res.ok) return dashboard(c, 400, { errors: [`Fetch failed with status ${res.status}.`] });
