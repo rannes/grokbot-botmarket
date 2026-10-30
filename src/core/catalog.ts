@@ -130,6 +130,7 @@ export function parseCatalog(input: unknown): { ok: true; catalog: Catalog } | {
 
   const errors: string[] = [];
   const bots: CatalogBot[] = [];
+  const seen = new Map<string, number>();
   head.data.bots.forEach((raw, i) => {
     const r = BotSchema.safeParse(raw);
     if (!r.success) {
@@ -137,6 +138,12 @@ export function parseCatalog(input: unknown): { ok: true; catalog: Catalog } | {
       return;
     }
     const d = r.data;
+    const first = seen.get(d.slug);
+    if (first !== undefined) {
+      errors.push(`bots[${i}].slug: duplicate of bots[${first}]`);
+      return;
+    }
+    seen.set(d.slug, i);
     let recipe: Recipe | null = null;
     if (d.recipe !== undefined && d.recipe !== null) {
       const pr = parseRecipe(d.recipe);
@@ -172,6 +179,11 @@ export function parseCatalog(input: unknown): { ok: true; catalog: Catalog } | {
       pageUrl: d.templateId ? templatePageUrl(d.templateId) : null,
     });
   });
+  if (errors.length > 100) {
+    const extra = errors.length - 100;
+    errors.length = 100;
+    errors.push(`... and ${extra} more`);
+  }
   if (errors.length > 0) return { ok: false, errors };
   return { ok: true, catalog: { format: CATALOG_FORMAT, generatedAt, site, bots } };
 }

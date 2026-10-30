@@ -1,3 +1,4 @@
+import { parseRecipe } from '../src/core/recipe.js';
 import { describe, it, expect } from 'vitest';
 import { CATALOG_FORMAT, toCatalogBot, exportCatalog, parseCatalog, catalogBotToNewBot } from '../src/core/catalog.js';
 import type { Bot } from '../src/db/bots-repo.js';
@@ -92,5 +93,76 @@ describe('catalog', () => {
     expect(nb).not.toHaveProperty('installUrl');
     expect(nb).not.toHaveProperty('createdAt');
     expect(nb.templateId).toBe(TID);
+  });
+  const base = () => JSON.parse(JSON.stringify(exportCatalog([bot()], site, now)));
+
+  it('rejects duplicate slugs', () => {
+    const cat = base();
+    cat.bots.push({ ...cat.bots[0] });
+    expect(failure(cat)).toContain('bots[1].slug: duplicate of bots[0]');
+  });
+
+  it.each(['http://example.com/a', 'javascript:alert(1)'])('rejects non-https URL %s', (u) => {
+    for (const f of ['authorUrl', 'imageUrl', 'sourceUrl', 'homepageUrl']) {
+      const cat = base();
+      cat.bots[0][f] = u;
+      expect(failure(cat).join(' ')).toContain(`bots[0].${f}`);
+    }
+    const cat = base();
+    cat.site.url = u;
+    expect(failure(cat).join(' ')).toContain('site.url');
+  });
+
+  it('round-trips a recipe bot with a normalized recipe', () => {
+    const pr = parseRecipe({ profile: { name: 'A', description: 'B' }, skills: [{ name: 's', content: '# x' }] });
+    if (!pr.ok) throw new Error('recipe');
+    const cat = exportCatalog([bot({ templateId: null, recipe: pr.recipe })], site, now);
+    const r = parseCatalog(JSON.parse(JSON.stringify(cat)));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.catalog).toEqual(cat);
+  });
+
+  it('caps the number of bots at 5000', () => {
+    const cat = base();
+    cat.bots = Array.from({ length: 5001 }, (_, i) => ({ ...cat.bots[0], slug: `b${i}` }));
+    expect(failure(cat).join(' ')).toMatch(/at most 5000/);
+  });
+
+  it('rejects too many or bad tags', () => {
+    let cat = base();
+    cat.bots[0].tags = Array.from({ length: 11 }, (_, i) => `t${i}`);
+    expect(failure(cat).join(' ')).toContain('bots[0].tags');
+    cat = base();
+    cat.bots[0].tags = [''];
+    expect(failure(cat).join(' ')).toContain('bots[0].tags');
+    cat = base();
+    cat.bots[0].tags = ['x'.repeat(33)];
+    expect(failure(cat).join(' ')).toContain('bots[0].tags');
+  });
+
+  it('rejects an invalid templateId and unknown category', () => {
+    let cat = base();
+    cat.bots[0].templateId = 'short';
+    expect(failure(cat).join(' ')).toContain('bots[0].templateId');
+    cat = base();
+    cat.bots[0].category = 'nonsense';
+    expect(failure(cat).join(' ')).toContain('bots[0].category');
+  });
+
+  it('rejects non-object bot entries and non-object input', () => {
+    const cat = base();
+    cat.bots = [null, 'x', 5];
+    const e = failure(cat);
+    expect(e.length).toBeGreaterThanOrEqual(3);
+    expect(e.join(' ')).toContain('bots[0]');
+    for (const bad of [null, 'str', 42, [], undefined]) expect(failure(bad).length).toBeGreaterThan(0);
+  });
+
+  it('caps the error list at 100 entries', () => {
+    const cat = base();
+    cat.bots = Array.from({ length: 300 }, () => null);
+    const e = failure(cat);
+    expect(e).toHaveLength(101);
+    expect(e[100]).toMatch(/^\.\.\. and \d+ more$/);
   });
 });
