@@ -1,0 +1,334 @@
+{
+  "format": "botmarket-catalog/v1",
+  "generatedAt": "2026-10-31T00:00:00.000Z",
+  "site": {
+    "name": "BotMarket seed",
+    "url": null
+  },
+  "bots": [
+    {
+      "slug": "outbound-prospecting",
+      "name": "Outbound Prospecting",
+      "tagline": "Finds prospects that match your ideal customer, then drafts a first message to each one. Every name is researched on the public web, and nothing sends without your yes.",
+      "descriptionMd": "Finds prospects that match your ideal customer, then drafts a first message to each one. Every name is researched on the public web, and nothing sends without your yes.\n\nListed from the public Grok Bot marketplace; the template and its contents belong to its creator.",
+      "category": "sales",
+      "tags": [
+        "sales",
+        "prospecting",
+        "outreach",
+        "research"
+      ],
+      "authorName": "Krista Letz",
+      "authorUrl": null,
+      "avatarShape": "pebble",
+      "avatarColor": "magenta",
+      "imageUrl": null,
+      "templateId": "i03IaF768-ielyzegoGye",
+      "recipe": null,
+      "sourceUrl": "https://x.ai/bot/marketplace/bots/pg",
+      "homepageUrl": null,
+      "createdAt": "2026-10-31T00:00:00.000Z",
+      "updatedAt": "2026-10-31T00:00:00.000Z"
+    },
+    {
+      "slug": "seo-aeo-desk",
+      "name": "SEO & AEO Desk",
+      "tagline": "Turns your keywords into content ideas and writer-ready briefs for search and AI answers. Works from a pasted keyword list or your Search Console.",
+      "descriptionMd": "Turns your keywords into content ideas and writer-ready briefs for search and AI answers. Works from a pasted keyword list or your Search Console.\n\nListed from the public Grok Bot marketplace; the template and its contents belong to its creator.",
+      "category": "marketing",
+      "tags": [
+        "seo",
+        "aeo",
+        "content",
+        "keywords"
+      ],
+      "authorName": "Adam Tanguay",
+      "authorUrl": null,
+      "avatarShape": "hex",
+      "avatarColor": "green",
+      "imageUrl": null,
+      "templateId": "0IhyZWxwbf2cFmsmroZQL",
+      "recipe": null,
+      "sourceUrl": "https://x.ai/bot/marketplace/bots/seo-aeo-desk",
+      "homepageUrl": null,
+      "createdAt": "2026-10-31T00:00:00.000Z",
+      "updatedAt": "2026-10-31T00:00:00.000Z"
+    },
+    {
+      "slug": "researchy",
+      "name": "Researchy",
+      "tagline": "A research and fact-check desk that runs every pass on the latest Grok model with live web search. For anyone who needs sourced, dated claims instead of a training-only answer.",
+      "descriptionMd": "A research and fact-check desk that runs every pass on the latest Grok model with live web search. For anyone who needs sourced, dated claims instead of a training-only answer.\n\nListed from the public Grok Bot marketplace; the template and its contents belong to its creator.",
+      "category": "engineering",
+      "tags": [
+        "research",
+        "fact-check",
+        "web-search"
+      ],
+      "authorName": "Farzad",
+      "authorUrl": null,
+      "avatarShape": "cloud",
+      "avatarColor": "violet",
+      "imageUrl": null,
+      "templateId": "i2hvaEONDg6_gEF5C9RlK",
+      "recipe": null,
+      "sourceUrl": "https://x.ai/bot/marketplace/bots/researchy",
+      "homepageUrl": null,
+      "createdAt": "2026-10-31T00:00:00.000Z",
+      "updatedAt": "2026-10-31T00:00:00.000Z"
+    },
+    {
+      "slug": "qa-bot",
+      "name": "QA bot",
+      "tagline": "Acts as your QA on the live deploy: runs the acceptance checklist and says pass or fail before you ship.",
+      "descriptionMd": "Acts as your QA on the live deploy: runs the acceptance checklist and says pass or fail before you ship.\n\nListed from the public Grok Bot marketplace; the template and its contents belong to its creator.",
+      "category": "engineering",
+      "tags": [
+        "qa",
+        "testing",
+        "deploy",
+        "checklist"
+      ],
+      "authorName": "Ulysses Ng",
+      "authorUrl": null,
+      "avatarShape": "teardrop",
+      "avatarColor": "magenta",
+      "imageUrl": null,
+      "templateId": "lKQWoQAvYgg_7Bkg2R-m7",
+      "recipe": null,
+      "sourceUrl": "https://x.ai/bot/marketplace/bots/qa-bot",
+      "homepageUrl": null,
+      "createdAt": "2026-10-31T00:00:00.000Z",
+      "updatedAt": "2026-10-31T00:00:00.000Z"
+    },
+    {
+      "slug": "imogen",
+      "name": "Imogen",
+      "tagline": "Imogen the Impala Image Interpreter writes brief, copyable alt text focused on the most important part of an image, so images are accessible to blind people.",
+      "descriptionMd": "Imogen the Impala Image Interpreter writes brief, copyable alt text focused on the most important part of an image, so images are accessible to blind people.\n\nListed from the public Grok Bot marketplace; the template and its contents belong to its creator.",
+      "category": "design",
+      "tags": [
+        "accessibility",
+        "alt-text",
+        "images"
+      ],
+      "authorName": "Kent C. Dodds",
+      "authorUrl": null,
+      "avatarShape": "egg",
+      "avatarColor": "violet",
+      "imageUrl": null,
+      "templateId": "Eeu5NZp62OzQjtlY4ons2",
+      "recipe": null,
+      "sourceUrl": "https://x.ai/bot/marketplace/bots/imogen",
+      "homepageUrl": null,
+      "createdAt": "2026-10-31T00:00:00.000Z",
+      "updatedAt": "2026-10-31T00:00:00.000Z"
+    },
+    {
+      "slug": "flora-plant-care-log",
+      "name": "Flora: Plant Care Log",
+      "tagline": "Flora keeps a private houseplant care log and weekly reminders. She builds a plant journal on her computer that you can page through, and your plants do not copy if someone else installs her.",
+      "descriptionMd": "Flora keeps a private houseplant care log and weekly reminders. She builds a plant journal on her computer that you can page through, and your plants do not copy if someone else installs her.\n\nListed from the public Grok Bot marketplace; the template and its contents belong to its creator.",
+      "category": "personal",
+      "tags": [
+        "plants",
+        "journal",
+        "reminders"
+      ],
+      "authorName": "Rich Silver",
+      "authorUrl": null,
+      "avatarShape": "leaf",
+      "avatarColor": "green",
+      "imageUrl": null,
+      "templateId": "dGYdqS9vLSXpxoNCPBHys",
+      "recipe": null,
+      "sourceUrl": "https://x.ai/bot/marketplace/bots/flora",
+      "homepageUrl": null,
+      "createdAt": "2026-10-31T00:00:00.000Z",
+      "updatedAt": "2026-10-31T00:00:00.000Z"
+    },
+    {
+      "slug": "recruiting-coordinator",
+      "name": "Recruiting Coordinator",
+      "tagline": "Schedules interview loops, preps your interviewers, and chases what's stalled. Works from your calendar or a pasted list, and never emails a candidate without you.",
+      "descriptionMd": "Schedules interview loops, preps your interviewers, and chases what's stalled. Works from your calendar or a pasted list, and never emails a candidate without you.\n\nListed from the public Grok Bot marketplace; the template and its contents belong to its creator.",
+      "category": "recruiting-people",
+      "tags": [
+        "recruiting",
+        "scheduling",
+        "interviews"
+      ],
+      "authorName": "Tommy Hansen",
+      "authorUrl": null,
+      "avatarShape": "teardrop",
+      "avatarColor": "red",
+      "imageUrl": null,
+      "templateId": "KDahOjiDbbAvxqx9KaGcq",
+      "recipe": null,
+      "sourceUrl": "https://x.ai/bot/marketplace/bots/mr-toms",
+      "homepageUrl": null,
+      "createdAt": "2026-10-31T00:00:00.000Z",
+      "updatedAt": "2026-10-31T00:00:00.000Z"
+    },
+    {
+      "slug": "meeting-recap-deck",
+      "name": "Meeting Recap Deck",
+      "tagline": "Turns your meeting notes into a recap deck in your slide template. Works from notes you paste or upload, and never invents a quote.",
+      "descriptionMd": "Turns your meeting notes into a recap deck in your slide template. Works from notes you paste or upload, and never invents a quote.\n\nListed from the public Grok Bot marketplace; the template and its contents belong to its creator.",
+      "category": "sales",
+      "tags": [
+        "meetings",
+        "slides",
+        "notes",
+        "recap"
+      ],
+      "authorName": "Krista Letz",
+      "authorUrl": null,
+      "avatarShape": "blob",
+      "avatarColor": "blue",
+      "imageUrl": null,
+      "templateId": "YklttiPpAHweKbOLV1TSF",
+      "recipe": null,
+      "sourceUrl": "https://x.ai/bot/marketplace/bots/echo",
+      "homepageUrl": null,
+      "createdAt": "2026-10-31T00:00:00.000Z",
+      "updatedAt": "2026-10-31T00:00:00.000Z"
+    },
+    {
+      "slug": "release-notes-bot",
+      "name": "Release Notes Bot",
+      "tagline": "Drafts weekly release notes from the pull requests merged since the last release.",
+      "descriptionMd": "Reads the pull requests merged over the past week, filters out changelog noise, and drafts release notes grouped by theme. Nothing is published without your review.\n\nA recipe-based example: install it by pasting the generated prompt into Grok Bot.",
+      "category": "engineering",
+      "tags": [
+        "release-notes",
+        "github",
+        "changelog",
+        "weekly"
+      ],
+      "avatarShape": "capsule",
+      "avatarColor": "blue",
+      "authorName": "BotMarket examples",
+      "authorUrl": null,
+      "imageUrl": null,
+      "templateId": null,
+      "sourceUrl": null,
+      "homepageUrl": null,
+      "createdAt": "2026-10-31T00:00:00.000Z",
+      "updatedAt": "2026-10-31T00:00:00.000Z",
+      "recipe": {
+        "format": "grokbot-recipe/v1",
+        "profile": {
+          "name": "Release Notes Bot",
+          "description": "Drafts weekly release notes from merged pull requests. Concise, user-facing language; never invents changes.",
+          "avatarShape": "capsule",
+          "avatarColor": "blue"
+        },
+        "memory": [
+          {
+            "content": "Release notes are written for end users, not engineers: lead with what changed for them, in plain language.",
+            "kind": "profile"
+          },
+          {
+            "content": "Group entries under Added, Improved and Fixed. Skip dependency bumps and CI-only changes unless they affect users.",
+            "kind": "profile"
+          }
+        ],
+        "skills": [
+          {
+            "name": "draft-release-notes",
+            "description": "Turn a list of merged pull requests into a release notes draft.",
+            "content": "# Draft release notes\n\n## Steps\n1. List the pull requests merged since the previous release (use the GitHub plugin).\n2. Run the `triage-changelog-noise` skill to drop entries users do not care about.\n3. Group what remains into **Added**, **Improved** and **Fixed**.\n4. Rewrite each entry as one user-facing sentence. Link the PR number.\n5. Flag anything that looks breaking under **Heads up**.\n6. Show the draft and wait for approval. Never publish on your own.\n\n## Output template\n```md\n# Release notes - <date>\n\n## Added\n- <sentence> (#123)\n\n## Improved\n- <sentence> (#124)\n\n## Fixed\n- <sentence> (#125)\n\n## Heads up\n- <breaking change, or \"Nothing this week.\">\n```\n"
+          },
+          {
+            "name": "triage-changelog-noise",
+            "description": "Decide which merged pull requests belong in the notes.",
+            "content": "# Triage changelog noise\n\nFor each merged pull request, decide **keep** or **drop**.\n\n**Drop** when the PR is:\n- a dependency bump with no user-visible effect\n- CI, build, lint or formatting only\n- a refactor or test-only change\n- a revert of something that never shipped\n\n**Keep** when users could notice it: new behavior, changed defaults, performance, bug fixes, deprecations.\n\nWhen unsure, keep it and mark it \"(check)\" so the reviewer can decide.\n"
+          }
+        ],
+        "routines": [
+          {
+            "name": "weekly-release-notes",
+            "description": "Draft the weekly release notes every Thursday morning.",
+            "content": "Run the `draft-release-notes` skill for the pull requests merged in the last 7 days and show me the draft.",
+            "schedule": "0 9 * * 4",
+            "timezone": "UTC",
+            "enabled": false
+          }
+        ],
+        "plugins": [
+          {
+            "name": "GitHub",
+            "description": "Read merged pull requests"
+          }
+        ],
+        "gettingStarted": {
+          "skill": "draft-release-notes"
+        },
+        "setupNotes": "Connect the GitHub plugin and tell the bot which repository to watch. The weekly routine is installed paused; enable it once you are happy with the first draft."
+      }
+    },
+    {
+      "slug": "standup-summarizer",
+      "name": "Standup Summarizer",
+      "tagline": "Condenses the daily standup channel into a short summary of progress, plans and blockers.",
+      "descriptionMd": "Reads the standup channel each morning and posts a short summary: what got done, what is planned, and who is blocked.\n\nA recipe-based example authored for BotMarket.",
+      "category": "operations",
+      "tags": [
+        "standup",
+        "slack",
+        "summary",
+        "daily"
+      ],
+      "avatarShape": "pebble",
+      "avatarColor": "green",
+      "authorName": "BotMarket examples",
+      "authorUrl": null,
+      "imageUrl": null,
+      "templateId": null,
+      "sourceUrl": null,
+      "homepageUrl": null,
+      "createdAt": "2026-10-31T00:00:00.000Z",
+      "updatedAt": "2026-10-31T00:00:00.000Z",
+      "recipe": {
+        "format": "grokbot-recipe/v1",
+        "profile": {
+          "name": "Standup Summarizer",
+          "description": "Summarizes the team standup channel into progress, plans and blockers.",
+          "avatarShape": "pebble",
+          "avatarColor": "green"
+        },
+        "memory": [
+          {
+            "content": "Keep summaries under 150 words. Always list blockers first, with the person who raised them.",
+            "kind": "profile"
+          }
+        ],
+        "skills": [
+          {
+            "name": "summarize-standup",
+            "description": "Summarize today's standup messages.",
+            "content": "# Summarize standup\n\n1. Read today's messages in the standup channel (Slack plugin).\n2. Collect, per person: done, planned, blocked.\n3. Write the summary:\n\n```md\n**Blockers**\n- <name>: <blocker>\n\n**Done**\n- <name>: <item>\n\n**Planned**\n- <name>: <item>\n```\n\n4. If someone did not post, list them under \"No update\".\n5. Never infer progress that was not written down.\n"
+          }
+        ],
+        "routines": [
+          {
+            "name": "daily-standup-summary",
+            "description": "Summarize the standup every weekday morning.",
+            "content": "Run the `summarize-standup` skill and show me the result.",
+            "schedule": "0 9 * * *",
+            "timezone": "UTC",
+            "enabled": false
+          }
+        ],
+        "plugins": [
+          {
+            "name": "Slack",
+            "description": "Read the standup channel"
+          }
+        ],
+        "setupNotes": "Connect the Slack plugin and tell the bot which channel is the standup channel."
+      }
+    }
+  ]
+}
