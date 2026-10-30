@@ -1,19 +1,8 @@
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 
-// TODO: switch to `import type { Category } from '../core/categories.js'` once that lands.
-export type Category =
-  | "engineering"
-  | "sales"
-  | "marketing"
-  | "design"
-  | "personal"
-  | "recruiting-people"
-  | "product"
-  | "operations"
-  | "other";
-
-// TODO: switch to the Recipe type from core once that lands.
-export type Recipe = Record<string, unknown>;
+import type { Category } from "../core/categories.js";
+import type { Recipe } from "../core/recipe.js";
+export type { Category, Recipe };
 
 const CATEGORIES: Category[] = [
   "engineering",
@@ -146,9 +135,11 @@ export class BotsRepo {
 
   list(opts: ListOpts = {}): Bot[] {
     const { sql, params } = this.where(opts);
+    const limit = Math.min(100, Math.max(1, Math.trunc(opts.limit ?? 50)));
+    const offset = Math.max(0, Math.trunc(opts.offset ?? 0));
     const rows = this.db
       .prepare(`SELECT * FROM bots ${sql} ORDER BY ${ORDER[opts.sort ?? "new"]} LIMIT ? OFFSET ?`)
-      .all(...params, opts.limit ?? 50, opts.offset ?? 0) as Row[];
+      .all(...params, limit, offset) as Row[];
     return rows.map(fromRow);
   }
 
@@ -205,7 +196,7 @@ export class BotsRepo {
   }
 
   insert(bot: NewBot): Bot {
-    const slug = this.freeSlug(bot.slug ?? slugify(bot.name));
+    const slug = this.freeSlug(bot.slug || slugify(bot.name));
     this.writeNew(slug, bot);
     return this.get(slug) as Bot;
   }
@@ -245,7 +236,16 @@ export class BotsRepo {
   }
 
   delete(slug: string): boolean {
-    return Number(this.db.prepare("DELETE FROM bots WHERE slug = ?").run(slug).changes) > 0;
+    this.db.exec("BEGIN");
+    try {
+      this.db.prepare("DELETE FROM events WHERE slug = ?").run(slug);
+      const n = Number(this.db.prepare("DELETE FROM bots WHERE slug = ?").run(slug).changes);
+      this.db.exec("COMMIT");
+      return n > 0;
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
   }
 
   setStatus(slug: string, status: Bot["status"]): void {
@@ -261,14 +261,25 @@ export class BotsRepo {
   }
 
   recordEvent(slug: string, kind: "install" | "upvote", visitorHash: string): boolean {
+    if (!this.db.prepare("SELECT 1 FROM bots WHERE slug = ?").get(slug)) return false;
     const day = this.now().toISOString().slice(0, 10);
-    const r = this.db
-      .prepare("INSERT OR IGNORE INTO events (slug, kind, visitor_hash, day) VALUES (?,?,?,?)")
-      .run(slug, kind, visitorHash, day);
-    if (Number(r.changes) === 0) return false;
     const col = kind === "install" ? "install_clicks" : "upvotes";
-    this.db.prepare(`UPDATE bots SET ${col} = ${col} + 1 WHERE slug = ?`).run(slug);
-    return true;
+    this.db.exec("BEGIN");
+    try {
+      const r = this.db
+        .prepare("INSERT OR IGNORE INTO events (slug, kind, visitor_hash, day) VALUES (?,?,?,?)")
+        .run(slug, kind, visitorHash, day);
+      if (Number(r.changes) === 0) {
+        this.db.exec("ROLLBACK");
+        return false;
+      }
+      this.db.prepare(`UPDATE bots SET ${col} = ${col} + 1 WHERE slug = ?`).run(slug);
+      this.db.exec("COMMIT");
+      return true;
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
   }
 
   categoryCounts(): Record<Category, number> {
@@ -282,14 +293,11 @@ export class BotsRepo {
 
   upsertFromCatalog(bot: NewBot & { slug: string }): Bot {
     if (!this.get(bot.slug)) {
-      this.writeNew(bot.slug, bot);
+      this.writeNew(bot.slug, { ...bot, status: bot.status ?? "published", featured: bot.featured ?? false });
       return this.get(bot.slug) as Bot;
     }
     const { slug, ...fields } = bot;
-    return this.update(slug, {
-      ...fields,
-      status: fields.status ?? "published",
-      featured: fields.featured ?? false,
-    }) as Bot;
+    // status/featured are admin state: undefined keeps the existing values.
+    return this.update(slug, fields) as Bot;
   }
 }

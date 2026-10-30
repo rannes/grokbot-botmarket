@@ -144,6 +144,45 @@ describe("BotsRepo", () => {
   });
 });
 
+describe("BotsRepo fixes", () => {
+  it("recordEvent on unknown slug returns false and stores nothing", () => {
+    expect(repo.recordEvent("ghost", "install", "h")).toBe(false);
+    repo.insert(mk("Ghost"));
+    expect(repo.recordEvent("ghost", "install", "h")).toBe(true);
+  });
+
+  it("delete removes events so a re-created slug can be counted again", () => {
+    repo.insert(mk("A"));
+    repo.recordEvent("a", "install", "h");
+    repo.delete("a");
+    repo.insert(mk("A"));
+    expect(repo.recordEvent("a", "install", "h")).toBe(true);
+    expect(repo.get("a")?.installClicks).toBe(1);
+  });
+
+  it("upsertFromCatalog preserves status and featured when unspecified", () => {
+    repo.insert(mk("A", { slug: "cat" }));
+    repo.setStatus("cat", "pending");
+    repo.setFeatured("cat", true);
+    const u = repo.upsertFromCatalog({ ...mk("A2"), slug: "cat" });
+    expect(u.status).toBe("pending");
+    expect(u.featured).toBe(true);
+    expect(u.name).toBe("A2");
+    const n = repo.upsertFromCatalog({ ...mk("New"), slug: "new" });
+    expect(n.status).toBe("published");
+    expect(n.featured).toBe(false);
+  });
+
+  it("q treats % and _ literally; empty slug is generated; limit is clamped", () => {
+    repo.insert(mk("100% real"));
+    repo.insert(mk("other"));
+    expect(repo.list({ q: "%" }).map((b) => b.name)).toEqual(["100% real"]);
+    expect(repo.list({ q: "_" })).toEqual([]);
+    expect(repo.insert(mk("Zed", { slug: "" })).slug).toBe("zed");
+    expect(repo.list({ limit: 0, offset: -5 })).toHaveLength(1);
+  });
+});
+
 describe("visitorHash", () => {
   it("is stable per day and differs by day", () => {
     const d1 = new Date("2026-01-01T10:00:00Z");
