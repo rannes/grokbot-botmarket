@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { NewBot } from '../db/bots-repo.js';
 import { isCategory, CATEGORIES } from './categories.js';
-import { parseRecipe, parseRecipeText, type Recipe } from './recipe.js';
+import { MAX_RECIPE_BYTES, parseRecipe, parseRecipeText, type Recipe } from './recipe.js';
 import { parseTemplateRef } from './template-link.js';
 
 const blankToNull = (v: unknown) => {
@@ -69,13 +69,18 @@ const recipeText = optString.transform((v, ctx): Recipe | null | undefined => {
   return t === '' ? undefined : recipeOrIssues(parseRecipeText(t), ctx);
 });
 
-/** JSON API convenience: a recipe object instead of recipeText. */
+/** JSON API convenience: a recipe object instead of recipeText. Same 2 MB cap as pasted text. */
 const recipeObject = z
   .unknown()
   .optional()
-  .transform((v, ctx): Recipe | null | undefined =>
-    v === undefined || v === null ? undefined : recipeOrIssues(parseRecipe(v), ctx),
-  );
+  .transform((v, ctx): Recipe | null | undefined => {
+    if (v === undefined || v === null) return undefined;
+    if (Buffer.byteLength(JSON.stringify(v) ?? '', 'utf8') > MAX_RECIPE_BYTES) {
+      raw(ctx, 'recipe: must be at most 2 MB');
+      return null;
+    }
+    return recipeOrIssues(parseRecipe(v), ctx);
+  });
 
 /** Form and JSON API fields for a bot submission. */
 export const BotInputSchema = z

@@ -12,7 +12,8 @@ export interface Config {
   seed: boolean;
   /**
    * Trust x-forwarded-for / x-forwarded-host / x-forwarded-proto (BOTMARKET_TRUST_PROXY).
-   * Only enable behind a reverse proxy that overwrites these headers.
+   * Only enable behind a reverse proxy that appends the client IP to x-forwarded-for (the last
+   * hop is used) and sets x-forwarded-proto / x-forwarded-host.
    */
   trustProxy: boolean;
 }

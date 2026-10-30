@@ -9,7 +9,7 @@ import { botFromInput, isHttpsUrl } from '../core/validation.js';
 import { resolveDeps, type AppDeps } from '../deps.js';
 import { BotAvatar, botPath } from '../views/components.js';
 import { Layout, MessagePage, sendPage } from '../views/layout.js';
-import { clientIp } from './shared.js';
+import { MAX_BODY_BYTES, clientIp } from './shared.js';
 
 const FIELDS = [
   'ref',
@@ -50,8 +50,6 @@ const LABELS: Record<string, string> = {
   avatarColor: 'Avatar color',
 };
 
-// Recipes may be up to 2 MB of JSON; leave room for the other fields and form encoding.
-const MAX_FORM_BYTES = 6 * 1024 * 1024;
 const TAGLINE_MAX = 200;
 
 function readValues(body: Record<string, unknown>): Values {
@@ -300,7 +298,7 @@ export function submitRoutes(deps: AppDeps): Hono {
   const siteName = config.siteName;
   const app = new Hono();
   const limit = bodyLimit({
-    maxSize: MAX_FORM_BYTES,
+    maxSize: MAX_BODY_BYTES,
     onError: (c) => sendPage(c, <MessagePage siteName={siteName} title="That’s too big"><p class="lede">The form was larger than 6 MB. Recipes can be at most 2 MB.</p></MessagePage>, 413),
   });
 

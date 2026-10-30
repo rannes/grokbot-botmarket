@@ -11,6 +11,7 @@ declare module 'hono' {
 const HOST_RE = /^(?:[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*|\[[0-9A-Fa-f:.]+\])(?::\d{1,5})?$/;
 
 const firstValue = (v: string | undefined): string => v?.split(',')[0]?.trim() ?? '';
+const lastValue = (v: string | undefined): string => v?.split(',').at(-1)?.trim() ?? '';
 
 function trusts(c: Context, config?: Partial<Pick<Config, 'trustProxy'>>): boolean {
   return config?.trustProxy ?? c.get('trustProxy') ?? false;
@@ -36,12 +37,14 @@ export function requestOrigin(
 }
 
 /**
- * Client address for rate limits and visitor hashes. With trustProxy on, the first hop of
- * x-forwarded-for; otherwise (and as a fallback) the socket address from node-server, else 'unknown'.
+ * Client address for rate limits and visitor hashes. With trustProxy on, the last hop of
+ * x-forwarded-for: the address our own proxy appended (earlier hops are client-controlled with
+ * appending proxies such as nginx's $proxy_add_x_forwarded_for, Caddy and Traefik). Otherwise (and
+ * as a fallback) the socket address from node-server, else 'unknown'.
  */
 export function clientIp(c: Context, config?: Partial<Pick<Config, 'trustProxy'>>): string {
   if (trusts(c, config)) {
-    const forwarded = firstValue(c.req.header('x-forwarded-for'));
+    const forwarded = lastValue(c.req.header('x-forwarded-for'));
     if (forwarded) return forwarded;
   }
   const env = c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined;
@@ -51,6 +54,9 @@ export function clientIp(c: Context, config?: Partial<Pick<Config, 'trustProxy'>
 export function recipeJsonUrl(origin: string, slug: string): string {
   return `${origin}/api/bots/${encodeURIComponent(slug)}/recipe.json`;
 }
+
+/** Largest request body accepted anywhere: a 2 MB recipe plus the other fields and form encoding. */
+export const MAX_BODY_BYTES = 6 * 1024 * 1024;
 
 export const OG_DEFAULT_PATH = '/static/og-default.png';
 

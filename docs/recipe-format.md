@@ -1,6 +1,6 @@
 # Recipe format: `grokbot-recipe/v1`
 
-A recipe describes a bot's profile, memories, skills, routines and plugins as plain JSON. It has the same shape Grok Bot uses when it hands a new bot its setup context from a template, so a bot's own export can be uploaded unchanged.
+A recipe describes a bot's profile, memories, skills, routines and plugins as plain JSON. It has the same shape Grok Bot uses when it hands a new bot its setup context from a template, so a bot's own export can be pasted unchanged.
 
 ## Example
 
@@ -113,8 +113,8 @@ The community bundle format is converted on import:
 | Skills | 64 |
 | Routines | 100 |
 | Plugins | 40 |
-| Recipe text (form upload, paste, CLI) | 2 MB |
-| Whole submission form | 6 MB |
+| Recipe JSON (pasted text, JSON API `recipe` object, CLI) | 2 MB |
+| Whole request body (form or JSON API) | 6 MB |
 | Skill and routine content | 200,000 characters each |
 
 Whitespace-only optional strings are dropped. Nesting deeper than 64 levels is rejected. Objects containing the keys `__proto__`, `constructor` or `prototype` are rejected. Validate locally with `grokbot-botmarket validate recipe.json`.
@@ -125,7 +125,7 @@ Recipes carry no secrets or API keys, no logins, no conversation history, no per
 
 ## Producing a recipe from a bot
 
-Ask your bot: "Export your template as JSON with profile, memory, skills, routines and plugins." Remove anything private, then upload or paste the result at `/submit`. The bot's output is accepted as is, aliases included.
+Ask your bot: "Export your template as JSON with profile, memory, skills, routines and plugins." Remove anything private, then paste the result at `/submit`. The bot's output is accepted as is, aliases included.
 
 ## How a recipe is installed
 

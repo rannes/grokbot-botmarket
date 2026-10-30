@@ -461,7 +461,7 @@ describe("submit", () => {
   it("rate limits submissions per forwarded IP when trustProxy is on", async () => {
     config = { ...config, trustProxy: true };
     const a = app({ submitLimiter: new RateLimiter(1, 60_000) });
-    const headers = { "x-forwarded-for": "203.0.113.9, 10.0.0.1" };
+    const headers = { "x-forwarded-for": "203.0.113.9" };
     const first = await a.request("/submit", { ...form(validSubmission), headers });
     expect(first.status).toBe(303);
     const second = await a.request("/submit", { ...form({ ...validSubmission, name: "Another" }), headers });
@@ -474,6 +474,24 @@ describe("submit", () => {
     const other = await a.request("/submit", {
       ...form({ ...validSubmission, name: "Third" }),
       headers: { "x-forwarded-for": "198.51.100.1" },
+    });
+    expect(other.status).toBe(303);
+  });
+
+  it("keys on the last x-forwarded-for hop, which the proxy appended", async () => {
+    config = { ...config, trustProxy: true };
+    const a = app({ submitLimiter: new RateLimiter(1, 60_000) });
+    const first = await a.request("/submit", { ...form(validSubmission), headers: { "x-forwarded-for": "1.1.1.1, 9.9.9.9" } });
+    expect(first.status).toBe(303);
+    // a client-chosen first hop does not buy a fresh budget
+    const spoofed = await a.request("/submit", {
+      ...form({ ...validSubmission, name: "Spoofed" }),
+      headers: { "x-forwarded-for": "2.2.2.2, 9.9.9.9" },
+    });
+    expect(spoofed.status).toBe(429);
+    const other = await a.request("/submit", {
+      ...form({ ...validSubmission, name: "Other Hop" }),
+      headers: { "x-forwarded-for": "1.1.1.1, 8.8.8.8" },
     });
     expect(other.status).toBe(303);
   });

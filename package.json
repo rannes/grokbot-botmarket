@@ -4,6 +4,12 @@
   "description": "Self-hosted marketplace for Grok Bot bots: publish a bot, share a link, one click adds it to Grok Bot.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rannes/grokbot-botmarket.git"
+  },
+  "homepage": "https://github.com/rannes/grokbot-botmarket#readme",
+  "bugs": "https://github.com/rannes/grokbot-botmarket/issues",
   "bin": {
     "grokbot-botmarket": "dist/index.js"
   },
@@ -18,7 +24,8 @@
   },
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsc -p tsconfig.json && cp -R src/public dist/public",
+    "build": "tsc -p tsconfig.json && rm -rf dist/public && cp -R src/public dist/public",
+    "prepack": "npm run build",
     "start": "node dist/index.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"

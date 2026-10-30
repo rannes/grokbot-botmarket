@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { openDatabase } from "../src/db/database.js";
 import { BotsRepo, type NewBot } from "../src/db/bots-repo.js";
 import { visitorHash } from "../src/db/visitor.js";
+import { exportCatalog, parseCatalog } from "../src/core/catalog.js";
 
 let clock = new Date("2026-01-01T00:00:00.000Z");
 let repo: BotsRepo;
@@ -44,6 +45,20 @@ describe("BotsRepo", () => {
     expect(repo.get("foo-bot")?.recipe).toEqual({ x: [1, 2], y: "z" });
     expect(repo.get("foo-bot")?.tags).toEqual(["t1", "t2"]);
     expect(repo.get("nope")).toBeNull();
+  });
+
+  it("keeps suffixed slugs within 64 chars so the catalog re-imports", () => {
+    const name = `${"a".repeat(61)} bc`; // slug: 61 a's + "-bc" = 64 chars
+    const first = repo.insert(mk(name, { templateId: "AbCdEfGhIjKlMnOpQrStU" }));
+    expect(first.slug).toHaveLength(64);
+    const second = repo.insert(mk(name, { templateId: "AbCdEfGhIjKlMnOpQrStU" }));
+    expect(second.slug).toBe(`${"a".repeat(61)}-2`);
+    expect(second.slug.length).toBeLessThanOrEqual(64);
+    const third = repo.insert(mk("b".repeat(64), { templateId: "AbCdEfGhIjKlMnOpQrStU" }));
+    const fourth = repo.insert(mk("b".repeat(64), { templateId: "AbCdEfGhIjKlMnOpQrStU" }));
+    expect(fourth.slug).toBe(`${"b".repeat(62)}-2`);
+    const parsed = parseCatalog(JSON.parse(JSON.stringify(exportCatalog([first, second, third, fourth], { name: "T", url: null }))));
+    expect(parsed.ok).toBe(true);
   });
 
   it("insert with duplicate slug gets a numeric suffix", () => {

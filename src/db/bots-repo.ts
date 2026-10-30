@@ -1,20 +1,9 @@
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 
-import type { Category } from "../core/categories.js";
+import { CATEGORIES, type Category } from "../core/categories.js";
 import type { Recipe } from "../core/recipe.js";
+import { MAX_SLUG_LENGTH, slugify } from "../core/slug.js";
 export type { Category, Recipe };
-
-const CATEGORIES: Category[] = [
-  "engineering",
-  "sales",
-  "marketing",
-  "design",
-  "personal",
-  "recruiting-people",
-  "product",
-  "operations",
-  "other",
-];
 
 export type Bot = {
   slug: string;
@@ -58,16 +47,6 @@ export type ListOpts = FilterOpts & {
 };
 
 type Row = Record<string, SQLInputValue>;
-
-function slugify(s: string): string {
-  const out = s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 64)
-    .replace(/-+$/g, "");
-  return out || "bot";
-}
 
 function fromRow(r: Row): Bot {
   return {
@@ -158,7 +137,10 @@ export class BotsRepo {
     const exists = this.db.prepare("SELECT 1 FROM bots WHERE slug = ?");
     if (!exists.get(base)) return base;
     for (let i = 2; ; i++) {
-      const candidate = `${base}-${i}`;
+      // Trim the base so base-N stays within the slug length limit (and importable as catalog JSON).
+      const suffix = `-${i}`;
+      const stem = base.slice(0, MAX_SLUG_LENGTH - suffix.length).replace(/-+$/, "") || "bot";
+      const candidate = `${stem}${suffix}`;
       if (!exists.get(candidate)) return candidate;
     }
   }
@@ -283,7 +265,7 @@ export class BotsRepo {
   }
 
   categoryCounts(): Record<Category, number> {
-    const out = Object.fromEntries(CATEGORIES.map((c) => [c, 0])) as Record<Category, number>;
+    const out = Object.fromEntries(CATEGORIES.map((c) => [c.id, 0])) as Record<Category, number>;
     const rows = this.db
       .prepare("SELECT category, COUNT(*) AS n FROM bots WHERE status = 'published' GROUP BY category")
       .all() as { category: Category; n: number }[];

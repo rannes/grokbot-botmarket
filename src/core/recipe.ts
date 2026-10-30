@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 export const RECIPE_FORMAT = 'grokbot-recipe/v1' as const;
 const BUNDLE_FORMAT = 'grokbot-bundle/v1';
-const MAX_TEXT_BYTES = 2 * 1024 * 1024;
+/** Largest recipe accepted, as UTF-8 JSON text (pasted text, or a JSON API object once serialized). */
+export const MAX_RECIPE_BYTES = 2 * 1024 * 1024;
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 /** Whitespace-only strings become undefined so optional fields are dropped. */
@@ -145,7 +146,7 @@ export function parseRecipe(input: unknown): ParseResult {
 }
 
 export function parseRecipeText(text: string): ParseResult {
-  if (Buffer.byteLength(text, 'utf8') > MAX_TEXT_BYTES) {
+  if (Buffer.byteLength(text, 'utf8') > MAX_RECIPE_BYTES) {
     return { ok: false, errors: ['recipe: file is larger than 2 MB'] };
   }
   let data: unknown;

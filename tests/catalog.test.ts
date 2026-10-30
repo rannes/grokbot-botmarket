@@ -102,15 +102,36 @@ describe('catalog', () => {
     expect(failure(cat)).toContain('bots[1].slug: duplicate of bots[0]');
   });
 
-  it.each(['http://example.com/a', 'javascript:alert(1)'])('rejects non-https URL %s', (u) => {
+  it.each(['http://example.com/a', 'javascript:alert(1)'])('rejects non-https bot URL %s', (u) => {
     for (const f of ['authorUrl', 'imageUrl', 'sourceUrl', 'homepageUrl']) {
       const cat = base();
       cat.bots[0][f] = u;
       expect(failure(cat).join(' ')).toContain(`bots[0].${f}`);
     }
+  });
+
+  it('accepts an http or https site.url, rejects other schemes', () => {
+    for (const u of ['http://localhost:3000', 'https://market.example.com']) {
+      const cat = base();
+      cat.site.url = u;
+      expect(parseCatalog(cat).ok).toBe(true);
+    }
     const cat = base();
-    cat.site.url = u;
+    cat.site.url = 'javascript:alert(1)';
     expect(failure(cat).join(' ')).toContain('site.url');
+  });
+
+  it('caps timestamp strings at 64 characters', () => {
+    const long = 'x'.repeat(65);
+    for (const mutate of [
+      (c: any) => (c.generatedAt = long),
+      (c: any) => (c.bots[0].createdAt = long),
+      (c: any) => (c.bots[0].updatedAt = long),
+    ]) {
+      const cat = base();
+      mutate(cat);
+      expect(parseCatalog(cat).ok).toBe(false);
+    }
   });
 
   it('round-trips a recipe bot with a normalized recipe', () => {

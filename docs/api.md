@@ -36,9 +36,9 @@ For template bots, `templateId` is the 21-character id, `installUrl` is `grokbot
 
 ## Rate limits
 
-Only submissions are rate limited: `POST /api/bots` and `POST /submit` share a limit of 10 per hour per client IP, and `POST /submit/lookup` is limited to 30 per 10 minutes per IP. Over the limit, the API returns `429` with `{"error":"rate limited"}` (the HTML form re-renders with a 429 and keeps the user's values). Limits are in memory and reset on restart. Upvotes and install clicks are not rate limited; they are de-duplicated per IP per day.
+Only submissions and admin logins are rate limited: `POST /api/bots` and `POST /submit` share a limit of 10 per hour per client IP, `POST /submit/lookup` is limited to 30 per 10 minutes per IP, and `POST /admin/login` to 10 attempts per 15 minutes per IP. Over the limit, the API returns `429` with `{"error":"rate limited"}` (the HTML form re-renders with a 429 and keeps the user's values). Limits are in memory and reset on restart. Upvotes and install clicks are not rate limited; they are de-duplicated per IP per day.
 
-The client IP is the socket address. When `BOTMARKET_TRUST_PROXY=true` (set this behind a reverse proxy) the forwarded headers are used instead.
+The client IP is the socket address. When `BOTMARKET_TRUST_PROXY=true` (set this behind a reverse proxy that appends to `X-Forwarded-For`) the last `X-Forwarded-For` hop is used instead. Request bodies over 6 MB get `413` with `{"error":"payload too large"}`.
 
 ## `GET /api/bots`
 
@@ -132,7 +132,7 @@ All published bots in `botmarket-catalog/v1` format, cached for 5 minutes (`Cach
 }
 ```
 
-`site.url` is `null` if the origin is unknown. On import, `format`, `generatedAt`, `site.name` and each bot's `slug`, `name`, `tagline`, `category`, `authorName` and a template id or recipe are required; at most 5000 bots; duplicate slugs and invalid entries reject the whole file with a list of errors. `installUrl` and `pageUrl` are recomputed on import.
+`site.url` is `null` if the origin is unknown; on import it may be `http:` or `https:` (it is informational), while bot URLs must be `https:`. Timestamps are strings of at most 64 characters. On import, `format`, `generatedAt`, `site.name` and each bot's `slug`, `name`, `tagline`, `category`, `authorName` and a template id or recipe are required; at most 5000 bots; duplicate slugs and invalid entries reject the whole file with a list of errors. `installUrl` and `pageUrl` are recomputed on import.
 
 Importing (admin page or `grokbot-botmarket import`) upserts by slug: a bot with the same slug is overwritten with the imported content, keeping its existing status and featured flag. New bots are created as published.
 
@@ -159,11 +159,12 @@ Returns `200` with `{"ok":true}`. Used by the Docker healthcheck.
 
 ## Admin
 
-Enabled only when `BOTMARKET_ADMIN_TOKEN` is set. Authenticate with `Authorization: Bearer <token>` or the signed cookie set by the login form. `GET /admin` shows a login page when unauthenticated, otherwise the dashboard. Admin POST routes answer `401` when unauthenticated and `403` when the CSRF (same-origin) check fails.
+Enabled only when `BOTMARKET_ADMIN_TOKEN` is set. Authenticate with `Authorization: Bearer <token>` or the signed cookie set by the login form. `GET /admin` shows a login page when unauthenticated, otherwise the dashboard. Admin POST routes answer `401` when unauthenticated and `403` when the CSRF (same-origin) check fails; the browser's `Origin` must match the request origin or `BOTMARKET_PUBLIC_URL`.
 
 | Route | Purpose |
 | --- | --- |
-| `POST /admin/login` | Form field `token`; sets the cookie and redirects (303). Wrong token: `401`. |
+| `POST /admin/login` | Form field `token`; sets the cookie and redirects (303). Wrong token: `401`. More than 10 attempts per IP in 15 minutes: `429`. |
+| `GET /admin/bots/:slug` | Bot page for any bot, pending included, with a preview banner and an Approve button for pending bots. `401` unauthenticated, `404` unknown slug. |
 | `POST /admin/logout` | Clears the cookie, redirects (303). |
 | `POST /admin/bots/:slug/approve` | Publish a pending bot. |
 | `POST /admin/bots/:slug/feature` | Feature a bot. |

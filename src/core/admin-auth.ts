@@ -1,7 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import type { Context } from 'hono';
 import { getCookie } from 'hono/cookie';
-import { resolveDeps, type AppDeps } from '../deps.js';
+import type { AppDeps } from '../deps.js';
 
 export const ADMIN_COOKIE = 'bm_admin';
 
@@ -25,16 +25,17 @@ export function verifyAdminCookie(value: string | undefined, token: string, salt
   return safeEqual(value, signAdminCookie(token, salt));
 }
 
-export function hasBearerAdmin(c: Context, deps: AppDeps): boolean {
+export function hasBearerAdmin(c: Context, deps: Pick<AppDeps, 'config'>): boolean {
   const token = deps.config.adminToken;
   if (!token) return false;
   const m = /^Bearer\s+(.+)$/i.exec(c.req.header('authorization') ?? '');
   return m ? verifyAdminToken(m[1]!.trim(), token) : false;
 }
 
-export function isAdminRequest(c: Context, deps: AppDeps): boolean {
+/** Bearer token or signed cookie. `salt` is the resolved deps salt the cookie was signed with. */
+export function isAdminRequest(c: Context, deps: Pick<AppDeps, 'config'>, salt: string): boolean {
   const token = deps.config.adminToken;
   if (!token) return false;
   if (hasBearerAdmin(c, deps)) return true;
-  return verifyAdminCookie(getCookie(c, ADMIN_COOKIE), token, resolveDeps(deps).salt);
+  return verifyAdminCookie(getCookie(c, ADMIN_COOKIE), token, salt);
 }

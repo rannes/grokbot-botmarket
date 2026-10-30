@@ -4,7 +4,7 @@
     {
       "name": "botmarket",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "npm run build >/dev/null && PORT=3000 BOTMARKET_DATA_DIR=.preview-data BOTMARKET_ADMIN_TOKEN=preview node dist/index.js serve"],
+      "runtimeArgs": ["-c", "npm run build >/dev/null && PORT=3000 BOTMARKET_DATA_DIR=.preview-data node dist/index.js serve"],
       "port": 3000
     }
   ]

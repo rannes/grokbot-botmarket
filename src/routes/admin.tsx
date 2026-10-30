@@ -4,16 +4,16 @@ import { ADMIN_COOKIE, hasBearerAdmin, isAdminRequest, signAdminCookie, verifyAd
 import { catalogBotToNewBot, parseCatalog } from '../core/catalog.js';
 import { resolveDeps, type AppDeps } from '../deps.js';
 import type { Bot } from '../db/bots-repo.js';
+import { BotDetail } from '../views/bot-detail.js';
 import { Layout, NotFoundPage, sendPage } from '../views/layout.js';
-import { botPath } from '../views/components.js';
-import { requestOrigin } from './shared.js';
+import { clientIp, requestOrigin } from './shared.js';
 
 const MAX_IMPORT_BYTES = 8 * 1024 * 1024;
 const LIST_LIMIT = 100; // repo.list caps at 100
 
 function ActionForm({ slug, action, label, danger }: { slug: string; action: string; label: string; danger?: boolean }) {
   return (
-    <form method="post" action={`/admin/bots/${encodeURIComponent(slug)}/${action}`}>
+    <form method="post" action={`${adminBotPath(slug)}/${action}`}>
       <button type="submit" class={danger ? 'btn btn-danger' : 'btn'}>
         {label}
       </button>
@@ -21,10 +21,12 @@ function ActionForm({ slug, action, label, danger }: { slug: string; action: str
   );
 }
 
+const adminBotPath = (slug: string) => `/admin/bots/${encodeURIComponent(slug)}`;
+
 function BotRow({ bot }: { bot: Bot }) {
   return (
     <li class="admin-row">
-      <a href={botPath(bot.slug)}>{bot.name}</a>
+      <a href={adminBotPath(bot.slug)}>{bot.name}</a>
       <span class="muted">by {bot.authorName}</span>
       {bot.featured ? <strong>featured</strong> : null}
       <span class="admin-actions">
@@ -165,7 +167,9 @@ export function adminRoutes(deps: AppDeps, fetchImpl: typeof fetch = fetch): Hon
     if (c.req.header('sec-fetch-site') === 'cross-site') return false;
     const origin = c.req.header('origin');
     if (origin) {
-      const allowed = new Set([new URL(c.req.url).origin, requestOrigin(c, { publicUrl: null })]);
+      // Behind an HTTPS-terminating proxy the request URL is http://internal; publicUrl names the real origin.
+      const allowed = new Set([new URL(c.req.url).origin, requestOrigin(c, d.config)]);
+      if (d.config.publicUrl && URL.canParse(d.config.publicUrl)) allowed.add(new URL(d.config.publicUrl).origin);
       if (!allowed.has(origin)) return false;
     }
     return true;
@@ -190,20 +194,43 @@ export function adminRoutes(deps: AppDeps, fetchImpl: typeof fetch = fetch): Hon
 
   /** Returns a Response when the request must not proceed. */
   function guard(c: Context): Response | null {
-    if (!isAdminRequest(c, d)) return c.text('unauthorized', 401);
+    if (!isAdminRequest(c, d, d.salt)) return c.text('unauthorized', 401);
     if (!csrfOk(c)) return c.text('forbidden', 403);
     return null;
   }
 
   app.get('/admin', async (c) => {
-    if (!isAdminRequest(c, d)) return sendPage(c, <LoginPage siteName={siteName} />);
+    if (!isAdminRequest(c, d, d.salt)) return sendPage(c, <LoginPage siteName={siteName} />);
     return dashboard(c, 200);
   });
 
   app.get('/admin/export', (c) => c.redirect('/catalog.json', 302));
 
+  /** Admin view of any bot, pending included, so a submission can be reviewed before approval. */
+  app.get('/admin/bots/:slug', (c) => {
+    if (!isAdminRequest(c, d, d.salt)) return c.text('unauthorized', 401);
+    const bot = d.repo.get(c.req.param('slug'));
+    if (!bot) return sendPage(c, <NotFoundPage siteName={siteName} />, 404);
+    return sendPage(
+      c,
+      <Layout title={bot.name} description={bot.tagline} siteName={siteName}>
+        {bot.status === 'pending' ? (
+          <div class="alert alert-warn" role="status">
+            <p class="alert-title">Pending — preview</p>
+            <p>Only admins can see this page. Install links and the badge work once the bot is approved.</p>
+            <ActionForm slug={bot.slug} action="approve" label="Approve" />
+          </div>
+        ) : null}
+        <BotDetail bot={bot} origin={requestOrigin(c, d.config)} />
+      </Layout>,
+    );
+  });
+
   app.post('/admin/login', async (c) => {
     if (!csrfOk(c)) return c.text('forbidden', 403);
+    if (!d.loginLimiter.allow(clientIp(c), d.now().getTime())) {
+      return sendPage(c, <LoginPage siteName={siteName} error="Too many login attempts. Wait 15 minutes and try again." />, 429);
+    }
     const body = await c.req.parseBody();
     const token = typeof body.token === 'string' ? body.token : '';
     const expected = d.config.adminToken as string;
@@ -214,7 +241,7 @@ export function adminRoutes(deps: AppDeps, fetchImpl: typeof fetch = fetch): Hon
       httpOnly: true,
       sameSite: 'Lax',
       path: '/admin',
-      secure: requestOrigin(c, { publicUrl: null }).startsWith('https:'),
+      secure: requestOrigin(c, d.config).startsWith('https:'),
     });
     return c.redirect('/admin', 303);
   });

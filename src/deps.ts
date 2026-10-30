@@ -15,15 +15,20 @@ export interface AppDeps {
   submitLimiter?: RateLimiter;
   /** Limiter for /submit/lookup, which fetches from x.ai; defaults to 30 per 10 minutes per IP. */
   lookupLimiter?: RateLimiter;
+  /** Limiter for POST /admin/login attempts; defaults to 10 per 15 minutes per IP. */
+  loginLimiter?: RateLimiter;
 }
 
-export type ResolvedDeps = AppDeps & Required<Pick<AppDeps, 'fetchMetadata' | 'now' | 'salt' | 'submitLimiter' | 'lookupLimiter'>>;
+export type ResolvedDeps = AppDeps &
+  Required<Pick<AppDeps, 'fetchMetadata' | 'now' | 'salt' | 'submitLimiter' | 'lookupLimiter' | 'loginLimiter'>>;
 
 const PROCESS_SALT = randomBytes(16).toString('hex');
 export const SUBMIT_LIMIT = 10;
 export const SUBMIT_WINDOW_MS = 60 * 60 * 1000;
 export const LOOKUP_LIMIT = 30;
 export const LOOKUP_WINDOW_MS = 10 * 60 * 1000;
+export const LOGIN_LIMIT = 10;
+export const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
 /** Fill in defaults. Idempotent: resolving resolved deps returns the same values (and the same limiter). */
 export function resolveDeps(deps: AppDeps): ResolvedDeps {
@@ -34,5 +39,6 @@ export function resolveDeps(deps: AppDeps): ResolvedDeps {
     salt: deps.salt ?? PROCESS_SALT,
     submitLimiter: deps.submitLimiter ?? new RateLimiter(SUBMIT_LIMIT, SUBMIT_WINDOW_MS),
     lookupLimiter: deps.lookupLimiter ?? new RateLimiter(LOOKUP_LIMIT, LOOKUP_WINDOW_MS),
+    loginLimiter: deps.loginLimiter ?? new RateLimiter(LOGIN_LIMIT, LOGIN_WINDOW_MS),
   };
 }

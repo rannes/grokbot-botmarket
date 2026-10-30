@@ -109,6 +109,35 @@ describe("admin", () => {
     expect(sc).toContain("SameSite=Lax");
   });
 
+  it("accepts login behind an HTTPS proxy when publicUrl names the origin", async () => {
+    const config = {
+      ...loadConfig({ BOTMARKET_SITE_NAME: "Test Market" }),
+      adminToken: TOKEN,
+      publicUrl: "https://bots.example",
+      trustProxy: false,
+    };
+    const a = createApp({ repo, config, salt: SALT });
+    // the proxy forwards to http://localhost; the browser sends the public origin
+    const ok = await a.request("http://localhost/admin/login", post({ origin: "https://bots.example" }, { token: TOKEN }));
+    expect(ok.status).toBe(303);
+    expect(ok.headers.get("set-cookie") ?? "").toContain("Secure");
+    const evil = await a.request("http://localhost/admin/login", post({ origin: "https://evil.example" }, { token: TOKEN }));
+    expect(evil.status).toBe(403);
+  });
+
+  it("rate limits login attempts per IP", async () => {
+    const a = app();
+    for (let i = 0; i < 10; i++) {
+      expect((await a.request("/admin/login", post({}, { token: `wrong-${i}` }))).status).toBe(401);
+    }
+    const limited = await a.request("/admin/login", post({}, { token: TOKEN }));
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("set-cookie")).toBeNull();
+    const html = await limited.text();
+    expect(html).toContain("Too many login attempts");
+    expect(html).toContain('name="token"');
+  });
+
   it("dashboard lists pending bots with cookie", async () => {
     const res = await app().request("/admin", { headers: cookie() });
     expect(res.status).toBe(200);
@@ -116,6 +145,26 @@ describe("admin", () => {
     expect(html).toContain("Pending Bot");
     expect(html).toContain("Live Bot");
     expect(html).toContain(`/admin/bots/${pendingSlug}/approve`);
+  });
+
+  it("previews pending bots for admins only", async () => {
+    const a = app();
+    const dash = await (await a.request("/admin", { headers: cookie() })).text();
+    const link = `/admin/bots/${pendingSlug}`;
+    expect(dash).toContain(`href="${link}"`);
+    const res = await a.request(link, { headers: cookie() });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("Pending Bot");
+    expect(html).toContain("Pending — preview");
+    expect(html).toContain(`${link}/approve`);
+    const live = await a.request(`/admin/bots/${liveSlug}`, { headers: cookie() });
+    expect(live.status).toBe(200);
+    expect(await live.text()).not.toContain("Pending — preview");
+    expect((await a.request(link)).status).toBe(401);
+    expect((await a.request("/admin/bots/nope", { headers: cookie() })).status).toBe(404);
+    // public routes stay published-only
+    expect((await a.request(`/bots/${pendingSlug}`)).status).toBe(404);
   });
 
   it("requires admin for actions", async () => {

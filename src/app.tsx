@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { resolveDeps, type AppDeps } from './deps.js';
 import { adminRoutes } from './routes/admin.js';
 import { apiRoutes } from './routes/api.js';
 import { installRoutes } from './routes/install.js';
 import { pagesRoutes } from './routes/pages.js';
-import { OG_DEFAULT_PATH } from './routes/shared.js';
+import { MAX_BODY_BYTES, OG_DEFAULT_PATH } from './routes/shared.js';
 import { submitRoutes } from './routes/submit.js';
 import { avatarColorCss } from './views/components.js';
 import { MessagePage, NotFoundPage, sendPage } from './views/layout.js';
@@ -45,6 +46,14 @@ export function createApp(deps: AppDeps): Hono {
     c.set('trustProxy', d.config.trustProxy === true);
     await next();
   });
+
+  // Caps every request body before any route buffers it (c.req.json()/parseBody() read it all).
+  // /submit and /submit/lookup carry the same limit with an HTML error page, so they are left to it.
+  const limitBody = bodyLimit({
+    maxSize: MAX_BODY_BYTES,
+    onError: (c) => c.json({ error: 'payload too large' }, 413),
+  });
+  app.use('*', (c, next) => (c.req.path === '/submit' || c.req.path === '/submit/lookup' ? next() : limitBody(c, next)));
 
   app.get('/static/styles.css', (c) =>
     c.body(STYLES, 200, { 'Content-Type': 'text/css; charset=utf-8', 'Cache-Control': STATIC_CACHE }),

@@ -30,7 +30,7 @@ There are two kinds of listings:
 From source (Node.js 22.13 or newer):
 
 ```sh
-git clone https://github.com/OWNER/grokbot-botmarket.git
+git clone https://github.com/rannes/grokbot-botmarket.git
 cd grokbot-botmarket
 npm ci && npm run build && npm start
 ```
@@ -63,7 +63,7 @@ By default (`BOTMARKET_SEED=true`) an empty database is seeded with 10 example b
 Open `/submit`.
 
 1. **Template link.** Paste a template link (`https://x.ai/bot/<id>`, the `grokbot://` link, the cursor.com universal link, or the bare id). The server fetches the name, description and image, and prefills the form.
-2. **Recipe.** Or paste or upload a recipe JSON. A bot's own export works unchanged.
+2. **Recipe.** Or paste a recipe JSON. A bot's own export works unchanged.
 3. Edit the fields (tagline, category, tags, longer description in Markdown) and publish.
 
 If `BOTMARKET_REQUIRE_APPROVAL=true`, new bots stay pending until an admin approves them.
@@ -107,9 +107,9 @@ Add this to your bot's README, replacing `YOUR-HOST` and `SLUG`:
 | `BOTMARKET_ADMIN_TOKEN` | unset | Enables `/admin` when set. Use a long random value. |
 | `BOTMARKET_REQUIRE_APPROVAL` | `false` | Hold new submissions as pending until approved. |
 | `BOTMARKET_SITE_NAME` | `BotMarket` | Name shown in the UI and OpenGraph tags. |
-| `BOTMARKET_PUBLIC_URL` | unset | Public base URL. Recommended in production; used for absolute recipe and OpenGraph URLs. |
+| `BOTMARKET_PUBLIC_URL` | unset | Public base URL, e.g. `https://bots.example.com`. Required in production: it anchors recipe URLs, OpenGraph tags and the catalog's `site.url`, and is the origin the admin CSRF check and `Secure` cookie flag go by behind an HTTPS-terminating proxy. |
 | `BOTMARKET_SEED` | `true` | Seed 10 example bots into an empty database. Set `false` for a clean production instance. |
-| `BOTMARKET_TRUST_PROXY` | `false` | When `false`, rate limiting uses the socket IP and `X-Forwarded-*` headers are ignored for origins. Set `true` behind a reverse proxy. |
+| `BOTMARKET_TRUST_PROXY` | `false` | When `false`, rate limiting uses the socket IP and `X-Forwarded-*` headers are ignored for origins. Set `true` behind a reverse proxy that appends the client IP to `X-Forwarded-For`; the last hop is used. The proxy must also send `X-Forwarded-Proto` and `X-Forwarded-Host`. |
 
 ## CLI
 
@@ -148,7 +148,7 @@ Bots without an image use the default social image `/static/og-default.png` in O
 - Deep links are built only from validated ids and URL-encoded text, never from raw user strings.
 - Descriptions are Markdown rendered to sanitized HTML. Only `https:` image URLs are allowed.
 - A Content-Security-Policy header is sent; there are no inline event handlers.
-- Submissions are rate limited per IP (10 per hour; template lookups 30 per 10 minutes). Install clicks and upvotes are de-duplicated per IP per day rather than limited. Set `BOTMARKET_TRUST_PROXY=true` only behind a reverse proxy you control.
+- Submissions are rate limited per IP (10 per hour; template lookups 30 per 10 minutes; admin logins 10 per 15 minutes). Request bodies are capped at 6 MB and recipes at 2 MB. Install clicks and upvotes are de-duplicated per IP per day rather than limited. Set `BOTMARKET_TRUST_PROXY=true` only behind a reverse proxy you control.
 - Metadata is fetched server-side only from validated template ids, with a timeout and size cap.
 - Admin routes require `BOTMARKET_ADMIN_TOKEN` (bearer header or signed cookie). Without it, `/admin` is disabled. Put the app behind HTTPS in production.
 

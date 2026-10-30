@@ -187,6 +187,19 @@ describe("POST /api/bots", () => {
     const res = await app().request("/api/bots", { method: "POST", headers: { "content-type": "application/json" }, body: "{" });
     expect(res.status).toBe(400);
   });
+  it("rejects bodies over 6 MB with 413 before parsing", async () => {
+    const res = await app().request("/api/bots", post({ ...base, templateRef: ID, descriptionMd: "x".repeat(7 * 1024 * 1024) }));
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: "payload too large" });
+    expect(repo.get("api-bot")).toBeNull();
+  });
+  it("caps an object recipe at 2 MB", async () => {
+    const big = { profile: { name: "Big" }, memory: ["m".repeat(3 * 1024 * 1024)] };
+    const res = await app().request("/api/bots", post({ ...base, recipe: big }));
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { errors: string[] }).errors).toContain("recipe: must be at most 2 MB");
+    expect(repo.get("api-bot")).toBeNull();
+  });
   it("rate limits", async () => {
     const a = app({ submitLimiter: new RateLimiter(1, 60000) });
     expect((await a.request("/api/bots", post({ ...base, templateRef: ID }, ip("9.9.9.9")))).status).toBe(201);

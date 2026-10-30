@@ -79,6 +79,12 @@ const httpsUrl = z
   .max(2048)
   .refine((s) => URL.canParse(s) && new URL(s).protocol === 'https:', 'must be an https URL');
 const optUrl = httpsUrl.nullish().transform((v) => v ?? null);
+/** site.url may be plain http so instances can federate during local testing; it is only informational. */
+const siteUrl = z
+  .string()
+  .max(2048)
+  .refine((s) => URL.canParse(s) && ['http:', 'https:'].includes(new URL(s).protocol), 'must be an http(s) URL');
+const timestamp = z.string().max(64);
 const optShort = z.string().max(32).nullish().transform((v) => v ?? null);
 
 const BotSchema = z.object({
@@ -97,14 +103,14 @@ const BotSchema = z.object({
   recipe: z.unknown().optional(),
   sourceUrl: optUrl,
   homepageUrl: optUrl,
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
+  createdAt: timestamp.optional(),
+  updatedAt: timestamp.optional(),
 });
 
 const CatalogSchema = z.object({
   format: z.literal(CATALOG_FORMAT, { errorMap: () => ({ message: `must be "${CATALOG_FORMAT}"` }) }),
-  generatedAt: z.string(),
-  site: z.object({ name: z.string().min(1).max(80), url: httpsUrl.nullish().transform((v) => v ?? null) }),
+  generatedAt: timestamp,
+  site: z.object({ name: z.string().min(1).max(80), url: siteUrl.nullish().transform((v) => v ?? null) }),
   bots: z.array(z.unknown()).max(MAX_BOTS, `must have at most ${MAX_BOTS} bots`),
 });
 

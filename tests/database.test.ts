@@ -19,6 +19,11 @@ describe("database", () => {
     expect(rows.map((r) => r.version)).toEqual(MIGRATIONS.map((_, i) => i + 1));
   });
 
+  it("sets a 5 second busy timeout", () => {
+    const db = openDatabase(":memory:");
+    expect(db.prepare("PRAGMA busy_timeout").get()).toEqual({ timeout: 5000 });
+  });
+
   it("is idempotent", () => {
     const db = openDatabase(":memory:");
     migrate(db);
