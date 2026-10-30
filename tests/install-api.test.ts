@@ -209,6 +209,16 @@ describe("POST /api/bots", () => {
   });
 });
 
+describe("POST /api/bots deep recipe", () => {
+  it("returns 400 for an absurdly nested recipe object", async () => {
+    const n = 200_000;
+    const recipeJson = '{"a":'.repeat(n) + "{}" + "}".repeat(n);
+    const body = `{"name":"Deep Bot","tagline":"t","category":"engineering","authorName":"Ann","recipe":${recipeJson}}`;
+    const res = await app().request("/api/bots", { method: "POST", headers: { "content-type": "application/json" }, body });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("POST /api/bots/:slug/upvote", () => {
   it("counts once per visitor", async () => {
     const r1 = await app().request("/api/bots/release-notes-bot/upvote", { method: "POST", headers: ip("3.3.3.3") });

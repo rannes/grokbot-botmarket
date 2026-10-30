@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
+import { RateLimiter } from "../src/core/rate-limit.js";
 import { signAdminCookie } from "../src/core/admin-auth.js";
 import { BotsRepo, type NewBot } from "../src/db/bots-repo.js";
 import { openDatabase } from "../src/db/database.js";
@@ -251,5 +252,23 @@ describe("admin", () => {
     const res = await app(TOKEN, f).request("/admin/import", post(cookie(), { url: "https://x.example/c.json" }));
     expect(res.status).toBe(400);
     expect(init?.redirect).toBe("error");
+  });
+});
+
+describe("admin Bearer brute-force limiting", () => {
+  it("rate limits wrong Bearer tokens but not valid ones", async () => {
+    const config = { ...loadConfig({ BOTMARKET_SITE_NAME: "Test Market" }), adminToken: TOKEN };
+    const a = createApp({ repo, config, salt: SALT, loginLimiter: new RateLimiter(3, 60_000) });
+    const wrong = { authorization: "Bearer nope" };
+    for (let i = 0; i < 3; i++) {
+      const r = await a.request("/admin", { headers: wrong });
+      expect(r.status).toBe(200);
+      expect(await r.text()).not.toContain("Pending");
+    }
+    const blocked = await a.request("/admin", { headers: wrong });
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toEqual({ error: "rate limited" });
+    const good = await a.request("/admin", { headers: bearer });
+    expect(good.status).toBe(200);
   });
 });

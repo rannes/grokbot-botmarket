@@ -75,7 +75,15 @@ const recipeObject = z
   .optional()
   .transform((v, ctx): Recipe | null | undefined => {
     if (v === undefined || v === null) return undefined;
-    if (Buffer.byteLength(JSON.stringify(v) ?? '', 'utf8') > MAX_RECIPE_BYTES) {
+    let json: string;
+    try {
+      json = JSON.stringify(v) ?? '';
+    } catch {
+      // Pathologically deep nesting overflows the stack in JSON.stringify; same wording parseRecipe uses for depth.
+      raw(ctx, 'recipe: nested too deeply');
+      return null;
+    }
+    if (Buffer.byteLength(json, 'utf8') > MAX_RECIPE_BYTES) {
       raw(ctx, 'recipe: must be at most 2 MB');
       return null;
     }

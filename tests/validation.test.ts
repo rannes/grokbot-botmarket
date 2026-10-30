@@ -130,3 +130,13 @@ describe("botFromInput error aggregation", () => {
     expect(e.some((m) => m.startsWith("recipe: not valid JSON"))).toBe(true);
   });
 });
+
+describe("deeply nested recipe object", () => {
+  it("is rejected with a validation error instead of throwing", () => {
+    let deep: unknown = {};
+    for (let i = 0; i < 200_000; i++) deep = { a: deep };
+    const r = botFromInput({ ...base, recipe: deep });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.join("; ")).toMatch(/nested too deeply/);
+  });
+});

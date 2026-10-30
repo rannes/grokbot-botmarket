@@ -148,7 +148,7 @@ Bots without an image use the default social image `/static/og-default.png` in O
 - Deep links are built only from validated ids and URL-encoded text, never from raw user strings.
 - Descriptions are Markdown rendered to sanitized HTML. Only `https:` image URLs are allowed.
 - A Content-Security-Policy header is sent; there are no inline event handlers.
-- Submissions are rate limited per IP (10 per hour; template lookups 30 per 10 minutes; admin logins 10 per 15 minutes). Request bodies are capped at 6 MB and recipes at 2 MB. Install clicks and upvotes are de-duplicated per IP per day rather than limited. Set `BOTMARKET_TRUST_PROXY=true` only behind a reverse proxy you control.
+- Submissions are rate limited per IP (10 per hour; template lookups 30 per 10 minutes; admin logins 10 per 15 minutes). Request bodies are capped at 6 MB and recipes at 2 MB. Install clicks and upvotes are de-duplicated per IP per day rather than limited. Admin login attempts (form or Bearer) are limited to 10 per 15 minutes per IP. Set `BOTMARKET_TRUST_PROXY=true` only behind a reverse proxy you control.
 - Metadata is fetched server-side only from validated template ids, with a timeout and size cap.
 - Admin routes require `BOTMARKET_ADMIN_TOKEN` (bearer header or signed cookie). Without it, `/admin` is disabled. Put the app behind HTTPS in production.
 

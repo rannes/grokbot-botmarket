@@ -192,14 +192,26 @@ export function adminRoutes(deps: AppDeps, fetchImpl: typeof fetch = fetch): Hon
     );
   }
 
+  /** True when an Authorization header is present but is not the admin token. */
+  function bearerFailed(c: Context): boolean {
+    return c.req.header('authorization') !== undefined && !hasBearerAdmin(c, d);
+  }
+
+  /** Wrong Bearer attempts spend from the login budget so tokens cannot be guessed online without limit. */
+  function bearerLimited(c: Context): boolean {
+    return bearerFailed(c) && !d.loginLimiter.allow(clientIp(c), d.now().getTime());
+  }
+
   /** Returns a Response when the request must not proceed. */
   function guard(c: Context): Response | null {
+    if (bearerLimited(c)) return c.json({ error: 'rate limited' }, 429);
     if (!isAdminRequest(c, d, d.salt)) return c.text('unauthorized', 401);
     if (!csrfOk(c)) return c.text('forbidden', 403);
     return null;
   }
 
   app.get('/admin', async (c) => {
+    if (bearerLimited(c)) return c.json({ error: 'rate limited' }, 429);
     if (!isAdminRequest(c, d, d.salt)) return sendPage(c, <LoginPage siteName={siteName} />);
     return dashboard(c, 200);
   });
@@ -208,6 +220,7 @@ export function adminRoutes(deps: AppDeps, fetchImpl: typeof fetch = fetch): Hon
 
   /** Admin view of any bot, pending included, so a submission can be reviewed before approval. */
   app.get('/admin/bots/:slug', (c) => {
+    if (bearerLimited(c)) return c.json({ error: 'rate limited' }, 429);
     if (!isAdminRequest(c, d, d.salt)) return c.text('unauthorized', 401);
     const bot = d.repo.get(c.req.param('slug'));
     if (!bot) return sendPage(c, <NotFoundPage siteName={siteName} />, 404);
