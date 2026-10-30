@@ -15,8 +15,11 @@ services:
       # BOTMARKET_SITE_NAME: BotMarket
       # Recommended in production; used for absolute recipe and OpenGraph URLs.
       # BOTMARKET_PUBLIC_URL: https://bots.example.com
-      # Seed example bots into an empty database.
-      # BOTMARKET_SEED: "true"
+      # Enabled by default: seeds 10 example bots into an empty database.
+      # Set to "false" for a clean production instance.
+      # BOTMARKET_SEED: "false"
+      # Set to "true" behind a reverse proxy to trust X-Forwarded-* headers.
+      # BOTMARKET_TRUST_PROXY: "true"
     restart: unless-stopped
 
 volumes:

@@ -1,125 +1,153 @@
 # HTTP API
 
-All JSON responses use `Content-Type: application/json`. Replace `https://botmarket.example.com` with your host. Bot objects below show the fields most clients need; additional fields may be present.
+Responses are JSON unless noted. Replace `https://botmarket.example.com` with your host. Only published bots are visible through the API; pending bots return `404`.
 
 Categories: `engineering`, `sales`, `marketing`, `design`, `personal`, `recruiting-people`, `product`, `operations`, `other`.
 
+## Bot object
+
+Every bot in the API (and in the catalog) has this shape:
+
+```json
+{
+  "slug": "release-notes-bot",
+  "name": "Release Notes Bot",
+  "tagline": "Drafts weekly release notes from merged PRs.",
+  "descriptionMd": "Markdown text",
+  "category": "engineering",
+  "tags": ["github", "releases"],
+  "authorName": "Ada",
+  "authorUrl": "https://example.com/ada",
+  "avatarShape": "capsule",
+  "avatarColor": "blue",
+  "imageUrl": null,
+  "templateId": null,
+  "recipe": { "format": "grokbot-recipe/v1", "profile": { "name": "Release Notes Bot", "description": "…" }, "memory": [], "skills": [], "routines": [], "plugins": [] },
+  "sourceUrl": null,
+  "homepageUrl": null,
+  "createdAt": "2026-10-31T12:00:00.000Z",
+  "updatedAt": "2026-10-31T12:00:00.000Z",
+  "installUrl": null,
+  "pageUrl": null
+}
+```
+
+For template bots, `templateId` is the 21-character id, `installUrl` is `grokbot://app/v1/bot-template?id=<id>` and `pageUrl` is `https://x.ai/bot/<id>`; for recipe bots `installUrl` and `pageUrl` are `null` (use `/add/<slug>`). A bot can have both a template and a recipe. Install counts and upvote counts are shown on the website but are not part of API objects.
+
 ## Rate limits
 
-Per client IP, in memory (reset on restart). Submissions (`POST /api/bots` and the `/submit` form): 10 per hour. Upvotes and install clicks are limited and de-duplicated per IP per day. Exceeding a limit returns `429` with a `Retry-After` header.
+Only submissions are rate limited: `POST /api/bots` and `POST /submit` share a limit of 10 per hour per client IP, and `POST /submit/lookup` is limited to 30 per 10 minutes per IP. Over the limit, the API returns `429` with `{"error":"rate limited"}` (the HTML form re-renders with a 429 and keeps the user's values). Limits are in memory and reset on restart. Upvotes and install clicks are not rate limited; they are de-duplicated per IP per day.
+
+The client IP is the socket address. When `BOTMARKET_TRUST_PROXY=true` (set this behind a reverse proxy) the forwarded headers are used instead.
 
 ## `GET /api/bots`
 
-Query parameters: `q` (text search), `category`, `sort` (`new` default, `top`, `installs`), `limit`, `offset`. Only published bots are returned.
+| Param | Notes |
+| --- | --- |
+| `q` | Text search. |
+| `category` | One of the categories above. |
+| `sort` | `new` (default), `top`, `installs`. |
+| `limit` | Default 50, maximum 100. |
+| `offset` | Default 0. |
+
+An invalid `category`, `sort`, `limit` or `offset` returns `400` with `{"error":"..."}`.
 
 ```sh
 curl 'https://botmarket.example.com/api/bots?category=engineering&sort=top&limit=2'
 ```
 
 ```json
-{
-  "bots": [
-    {
-      "slug": "release-notes-bot",
-      "name": "Release Notes Bot",
-      "tagline": "Drafts weekly release notes from merged PRs.",
-      "category": "engineering",
-      "tags": ["github", "releases"],
-      "authorName": "Ada",
-      "installClicks": 12,
-      "upvotes": 4
-    }
-  ],
-  "total": 1
-}
+{ "bots": [ { "slug": "release-notes-bot", "name": "Release Notes Bot", "…": "…" } ], "total": 1 }
 ```
 
-Status: `200`; `400` for invalid parameters.
+`total` counts all matches ignoring `limit` and `offset`.
 
 ## `GET /api/bots/:slug`
 
-Returns one published bot (full fields including `descriptionMd`, `templateRef`, `imageUrl`, links). Status: `200`, `404`.
+Returns one bot object. `404` with `{"error":"not found"}` if missing or pending.
 
 ## `GET /api/bots/:slug/recipe.json`
 
-Returns the normalized `grokbot-recipe/v1` recipe. See [recipe-format.md](recipe-format.md). Status: `200`; `404` if the bot does not exist or has no recipe.
+Returns the normalized `grokbot-recipe/v1` recipe with `Content-Disposition: inline; filename="<slug>.recipe.json"`. `404` if the bot is missing, pending, or has no recipe. See [recipe-format.md](recipe-format.md).
 
 ## `POST /api/bots`
 
-Publish a bot. Body is JSON:
+Publish a bot. Send JSON (`Content-Type: application/json`).
 
-| Field | Type | Notes |
+| Field | Type | Rules |
 | --- | --- | --- |
-| `name` | string | required |
-| `tagline` | string | required, up to 200 characters |
-| `descriptionMd` | string | Markdown, up to 20,000 characters |
-| `category` | string | one of the categories above |
-| `tags` | string[] | up to 10 |
-| `authorName` | string | required |
-| `authorUrl` | string | optional https URL |
-| `imageUrl` | string | optional https URL |
-| `templateRef` | string | template link or 21-character id |
-| `recipeText` or `recipe` | string or object | recipe JSON as text or object |
-| `sourceUrl`, `homepageUrl` | string | optional URLs |
+| `name` | string | required, 1-80 characters |
+| `tagline` | string | required, 1-200 characters |
+| `descriptionMd` | string | Markdown, up to 20,000 characters, default empty |
+| `category` | string | required, one of the categories above |
+| `tags` | string[] or comma-separated string | lowercased, de-duplicated, at most 10, each at most 32 characters |
+| `authorName` | string | required, 1-80 characters |
+| `authorUrl`, `imageUrl`, `sourceUrl`, `homepageUrl` | string | optional, `https:` URLs only, up to 2048 characters |
+| `avatarShape`, `avatarColor` | string | optional, up to 32 characters; default from the recipe profile |
+| `templateRef` | string | template link (`https://x.ai/bot/<id>`, `grokbot://` link, cursor.com link) or bare 21-character id |
+| `recipeText` | string | recipe JSON as text (up to 2 MB) |
+| `recipe` | object | recipe as a JSON object; `recipeText` wins if both are set |
 
 At least one of `templateRef` and a recipe is required.
 
 ```sh
-curl -X POST https://botmarket.example.com/api/bots \
+curl -i -X POST https://botmarket.example.com/api/bots \
   -H 'Content-Type: application/json' \
-  -d '{"name":"Release Notes Bot","tagline":"Weekly notes from PRs","category":"engineering","authorName":"Ada","recipe":{"profile":{"name":"Release Notes Bot","description":"Drafts notes."}}}'
+  -d '{"name":"Release Notes Bot","tagline":"Weekly notes from PRs","category":"engineering","authorName":"Ada","recipe":{"profile":{"name":"Release Notes Bot"}}}'
 ```
+
+Response `201` with header `Location: /bots/release-notes-bot` and the full bot object plus `status`:
 
 ```json
-{ "slug": "release-notes-bot", "status": "published" }
+{ "slug": "release-notes-bot", "name": "Release Notes Bot", "…": "…", "status": "published" }
 ```
 
-`status` is `pending` when the instance requires approval. Status: `201` created; `400` validation error (body describes the problem); `429` rate limited.
+`status` is `pending` when the instance sets `BOTMARKET_REQUIRE_APPROVAL=true`; the bot is then hidden until an admin approves it. Errors:
+
+- `400` with `{"errors": ["name: is required", "recipe: profile: is required"]}`; also returned when the body is not valid JSON.
+- `429` with `{"error":"rate limited"}`.
+
+The slug is generated from the name.
 
 ## `POST /api/bots/:slug/upvote`
 
-Adds an upvote, de-duplicated per IP per day.
+No body. Counts one upvote per IP per day.
 
 ```json
-{ "upvotes": 5 }
+{ "upvotes": 5, "counted": true }
 ```
 
-Status: `200`, `404`, `429`.
+A repeat upvote the same day returns `200` with `counted: false` and the unchanged total. `404` if the bot is missing or pending.
 
 ## `GET /catalog.json`
 
-All published bots in the `botmarket-catalog/v1` format, for federation and backups.
+All published bots in `botmarket-catalog/v1` format, cached for 5 minutes (`Cache-Control: public, max-age=300`). Used for federation and backups.
 
 ```json
 {
   "format": "botmarket-catalog/v1",
-  "site": "BotMarket",
-  "exportedAt": "2026-10-31T12:00:00.000Z",
-  "bots": [
-    {
-      "slug": "release-notes-bot",
-      "name": "Release Notes Bot",
-      "tagline": "Drafts weekly release notes from merged PRs.",
-      "descriptionMd": "…",
-      "category": "engineering",
-      "tags": ["github"],
-      "authorName": "Ada",
-      "templateRef": null,
-      "recipe": { "profile": { "name": "Release Notes Bot", "description": "…" } }
-    }
-  ]
+  "generatedAt": "2026-10-31T12:00:00.000Z",
+  "site": { "name": "BotMarket", "url": "https://botmarket.example.com" },
+  "bots": [ { "slug": "release-notes-bot", "…": "bot object as above" } ]
 }
 ```
 
-Status: `200`.
+`site.url` is `null` if the origin is unknown. On import, `format`, `generatedAt`, `site.name` and each bot's `slug`, `name`, `tagline`, `category`, `authorName` and a template id or recipe are required; at most 5000 bots; duplicate slugs and invalid entries reject the whole file with a list of errors. `installUrl` and `pageUrl` are recomputed on import.
+
+Importing (admin page or `grokbot-botmarket import`) upserts by slug: a bot with the same slug is overwritten with the imported content, keeping its existing status and featured flag. New bots are created as published.
 
 ## `GET /add/:slug`
 
-Counts an install click and responds `302` to the bot's deep link: `grokbot://app/v1/bot-template?id=<id>` for template bots, or `grokbot://app/v1/prompt?text=...` for recipe bots. With `?via=web`, redirects to `https://x.ai/bot/<id>`. Status: `302`, `404`, `429`.
+Counts an install click (de-duplicated per IP per day) and redirects with `302` and `Cache-Control: no-store`:
+
+- template bot: `grokbot://app/v1/bot-template?id=<id>`; with `?via=web`, `https://x.ai/bot/<id>`.
+- recipe bot: `grokbot://app/v1/prompt?text=<setup prompt>`.
+
+`404` if the bot is missing or pending. `/add` is never rate limited.
 
 ## `GET /badge/:slug.svg`
 
-An "Add to Grok Bot" SVG badge for READMEs. Status: `200` (`image/svg+xml`), `404`.
+The "Add to Grok Bot" SVG badge (`image/svg+xml`, cached for an hour). `404` if the bot is missing or pending.
 
 ```md
 [![Add to Grok Bot](https://YOUR-HOST/badge/SLUG.svg)](https://YOUR-HOST/add/SLUG)
@@ -127,8 +155,21 @@ An "Add to Grok Bot" SVG badge for READMEs. Status: `200` (`image/svg+xml`), `40
 
 ## `GET /healthz`
 
-Liveness check used by the Docker healthcheck. Status: `200`.
+Returns `200` with `{"ok":true}`. Used by the Docker healthcheck.
 
 ## Admin
 
-Enabled only when `BOTMARKET_ADMIN_TOKEN` is set. Authenticate with `Authorization: Bearer <token>`, or log in at `/admin` (sets a signed cookie). From `/admin` you can approve pending bots, feature or unfeature, delete, and import another BotMarket's `catalog.json`. Wrong or missing token: `401`; admin disabled: `404`.
+Enabled only when `BOTMARKET_ADMIN_TOKEN` is set. Authenticate with `Authorization: Bearer <token>` or the signed cookie set by the login form. `GET /admin` shows a login page when unauthenticated, otherwise the dashboard. Admin POST routes answer `401` when unauthenticated and `403` when the CSRF (same-origin) check fails.
+
+| Route | Purpose |
+| --- | --- |
+| `POST /admin/login` | Form field `token`; sets the cookie and redirects (303). Wrong token: `401`. |
+| `POST /admin/logout` | Clears the cookie, redirects (303). |
+| `POST /admin/bots/:slug/approve` | Publish a pending bot. |
+| `POST /admin/bots/:slug/feature` | Feature a bot. |
+| `POST /admin/bots/:slug/unfeature` | Remove the featured flag. |
+| `POST /admin/bots/:slug/delete` | Delete a bot permanently. |
+| `POST /admin/import` | Field or JSON `url`: an `https:` URL of another BotMarket's `catalog.json` (5 second timeout, 8 MB cap, no redirects). Upserts as described above. |
+| `GET /admin/export` | Redirects (302) to `/catalog.json`. |
+
+Bot actions redirect (303) to `/admin`; an unknown slug or action is `404`; a failed import re-renders the dashboard with `400` and the errors.

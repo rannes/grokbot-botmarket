@@ -21,58 +21,58 @@ A recipe describes a bot's profile, memories, skills, routines and plugins as pl
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `format` | string | no | `"grokbot-recipe/v1"`. If absent, the format is detected by the presence of `profile`. |
-| `profile` | object | yes | See below. |
+| `format` | string | no | `"grokbot-recipe/v1"` (or `"grokbot-bundle/v1"`, converted). Any other value is rejected. Output is always `grokbot-recipe/v1`. |
+| `profile` | object | yes (or `persona` for bundles) | See below. If `profile` is absent and `persona` is present, the input is treated as a `grokbot-bundle/v1`. |
 | `memory` | array | no, default `[]` | Memory entries. |
 | `skills` | array | no, default `[]` | Skill definitions. |
 | `routines` | array | no, default `[]` | Scheduled or triggered prompts. |
 | `plugins` | array | no, default `[]` | Plugins the bot expects. |
-| `gettingStarted` | object | no | `{ "skill": "<skill name>" }`: the skill to run first. |
-| `setupNotes` | string | no | Free text for whoever installs the recipe. |
+| `gettingStarted` | object | no | `{ "skill": "<skill name>" }` (skill up to 200 characters): the skill to run first. A bare string is accepted and read as the skill name. |
+| `setupNotes` | string | no | Free text for whoever installs the recipe, up to 20,000 characters. |
 
 ### `profile`
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `name` | string | yes | Up to 200 characters. |
-| `description` | string | yes | Up to 20,000 characters. |
-| `avatarShape` | string | no | For example `pebble`, `capsule`, `teardrop`. |
-| `avatarColor` | string | no | A color name such as `magenta` or `blue`. |
+| `description` | string | no | Up to 20,000 characters. Defaults to an empty string. |
+| `avatarShape` | string | no | Up to 100 characters. For example `pebble`, `capsule`, `teardrop`. |
+| `avatarColor` | string | no | Up to 100 characters. A color name such as `magenta` or `blue`. |
 
 ### `memory[]`
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `content` | string | yes | The memory text. Written as a journal memory on install. |
-| `kind` | string | no | For example `profile`. |
-| `createdAt` | string | no | ISO 8601 timestamp. |
+| `content` | string | yes | 1-20,000 characters. Written as a journal memory on install. |
+| `kind` | string | no | Either `profile` or `log`. |
+| `createdAt` | string | no | Any string up to 100 characters (normally ISO 8601). |
 
 ### `skills[]`
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `name` | string | yes | Skill name. |
-| `description` | string | no | What the skill does. |
-| `content` | string | yes | Skill body, usually Markdown. |
+| `name` | string | yes | 1-200 characters. |
+| `description` | string | no | Up to 20,000 characters. |
+| `content` | string | yes | 1-200,000 characters, usually Markdown. |
 
 ### `routines[]`
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `name` | string | yes | |
-| `description` | string | no | |
-| `content` | string | yes | The prompt the routine runs. |
-| `schedule` | string | no | Cron expression. |
-| `timezone` | string | no | IANA zone, for example `Europe/Tallinn`. |
+| `name` | string | yes | 1-200 characters. |
+| `description` | string | no | Up to 20,000 characters. |
+| `content` | string | yes | The prompt the routine runs, 1-200,000 characters. |
+| `schedule` | string | no | Up to 200 characters, normally a cron expression. |
+| `timezone` | string | no | Up to 100 characters, IANA zone such as `Europe/Tallinn`. |
 | `enabled` | boolean | no | Informational. Routines are always created paused on install. |
 
 ### `plugins[]`
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `pluginId` | string | no | The Grok Bot marketplace plugin id (digits). |
-| `name` | string | yes | |
-| `description` | string | no | Why the bot wants it. |
+| `pluginId` | string | no | Up to 200 characters. The Grok Bot marketplace plugin id (digits). |
+| `name` | string | yes | 1-200 characters. |
+| `description` | string | no | Up to 20,000 characters. Why the bot wants it. |
 
 Plugins are installed only after the user confirms.
 
@@ -92,11 +92,16 @@ The community bundle format is converted on import:
 
 | Bundle | Recipe |
 | --- | --- |
-| `persona` | `profile` |
+| `persona` (`name`, `description`, `avatarShape`, `avatarColor`) | `profile` |
 | `memories[].text` | `memory[].content` |
-| `skills[].body` | `skills[].content` |
-| `routines[].prompt` | `routines[].content` |
+| `memories[].kind` | `memory[].kind` |
+| `skills[].body` (or `content`) | `skills[].content` |
+| `routines[].prompt` (or `content`) | `routines[].content` |
+| `routines[].triggerSummary` | `routines[].description` |
+| `routines[].schedule` | `routines[].schedule` |
 | `plugins[].id` | `plugins[].pluginId` |
+| `plugins[].name` (falls back to `id`) | `plugins[].name` |
+| `plugins[].note` | `plugins[].description` |
 
 ## Limits
 
@@ -108,9 +113,11 @@ The community bundle format is converted on import:
 | Skills | 64 |
 | Routines | 100 |
 | Plugins | 40 |
-| Total size | 2 MB |
+| Recipe text (form upload, paste, CLI) | 2 MB |
+| Whole submission form | 6 MB |
+| Skill and routine content | 200,000 characters each |
 
-Objects containing the keys `__proto__`, `constructor` or `prototype` are rejected. Validate locally with `grokbot-botmarket validate recipe.json`.
+Whitespace-only optional strings are dropped. Nesting deeper than 64 levels is rejected. Objects containing the keys `__proto__`, `constructor` or `prototype` are rejected. Validate locally with `grokbot-botmarket validate recipe.json`.
 
 ## What is never included
 

@@ -25,10 +25,12 @@ There are two kinds of listings:
 
 ## Quick start
 
-With npx:
+From source (Node.js 22.13 or newer):
 
 ```sh
-npx grokbot-botmarket
+git clone https://github.com/OWNER/grokbot-botmarket.git
+cd grokbot-botmarket
+npm ci && npm run build && npm start
 ```
 
 With Docker:
@@ -38,6 +40,7 @@ docker build -t grokbot-botmarket .
 docker run -d --name botmarket -p 3000:3000 -v botmarket-data:/data \
   -e BOTMARKET_ADMIN_TOKEN=change-me \
   -e BOTMARKET_PUBLIC_URL=https://bots.example.com \
+  -e BOTMARKET_SEED=false \
   grokbot-botmarket
 ```
 
@@ -47,7 +50,11 @@ With Docker Compose:
 docker compose up -d
 ```
 
-Then open http://localhost:3000. Requires Node.js 22.13 or newer when not using Docker.
+Once the package is published to npm, `npx grokbot-botmarket` will also work.
+
+Then open http://localhost:3000.
+
+By default (`BOTMARKET_SEED=true`) an empty database is seeded with 10 example bots. Set `BOTMARKET_SEED=false` for a clean production instance.
 
 ## Publishing a bot
 
@@ -93,19 +100,23 @@ Add this to your bot's README, replacing `YOUR-HOST` and `SLUG`:
 | Variable | Default | Description |
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP port. |
+| `HOST` | `0.0.0.0` | Interface to bind. |
 | `BOTMARKET_DATA_DIR` | `./data` | Directory for the SQLite database (`/data` in Docker). |
 | `BOTMARKET_ADMIN_TOKEN` | unset | Enables `/admin` when set. Use a long random value. |
 | `BOTMARKET_REQUIRE_APPROVAL` | `false` | Hold new submissions as pending until approved. |
 | `BOTMARKET_SITE_NAME` | `BotMarket` | Name shown in the UI and OpenGraph tags. |
 | `BOTMARKET_PUBLIC_URL` | unset | Public base URL. Recommended in production; used for absolute recipe and OpenGraph URLs. |
-| `BOTMARKET_SEED` | `true` | Seed example bots into an empty database. |
+| `BOTMARKET_SEED` | `true` | Seed 10 example bots into an empty database. Set `false` for a clean production instance. |
+| `BOTMARKET_TRUST_PROXY` | `false` | When `false`, rate limiting uses the socket IP and `X-Forwarded-*` headers are ignored for origins. Set `true` behind a reverse proxy. |
 
 ## CLI
+
+The binary is `grokbot-botmarket` (the built-in help text calls it `botmarket`).
 
 ```
 grokbot-botmarket serve                          # default
 grokbot-botmarket import <catalog-url-or-file>   # import a catalog.json
-grokbot-botmarket export [file]                  # write catalog.json
+grokbot-botmarket export [file]                  # write catalog.json (stdout if no file)
 grokbot-botmarket validate <recipe.json>         # check a recipe
 ```
 
@@ -126,14 +137,16 @@ Full reference: [docs/api.md](docs/api.md).
 
 ## Federation
 
-`GET /catalog.json` exports every published bot in the `botmarket-catalog/v1` format. An admin can import another BotMarket's catalog from `/admin` (or with `grokbot-botmarket import <url>`), which merges its bots into this instance. Run `grokbot-botmarket export` for a file backup.
+`GET /catalog.json` exports every published bot in the `botmarket-catalog/v1` format. An admin can import another BotMarket's catalog from `/admin` (or with `grokbot-botmarket import <url>`), which upserts its bots by slug: a bot with the same slug is overwritten, keeping its existing status and featured flag. Run `grokbot-botmarket export` for a file backup.
 
 ## Security notes
+
+Bots without an image use the default social image `/static/og-default.png` in OpenGraph tags.
 
 - Deep links are built only from validated ids and URL-encoded text, never from raw user strings.
 - Descriptions are Markdown rendered to sanitized HTML. Only `https:` image URLs are allowed.
 - A Content-Security-Policy header is sent; there are no inline event handlers.
-- Submissions and clicks are rate limited per IP (submissions: 10 per hour).
+- Submissions are rate limited per IP (10 per hour; template lookups 30 per 10 minutes). Install clicks and upvotes are de-duplicated per IP per day rather than limited. Set `BOTMARKET_TRUST_PROXY=true` only behind a reverse proxy you control.
 - Metadata is fetched server-side only from validated template ids, with a timeout and size cap.
 - Admin routes require `BOTMARKET_ADMIN_TOKEN` (bearer header or signed cookie). Without it, `/admin` is disabled. Put the app behind HTTPS in production.
 
