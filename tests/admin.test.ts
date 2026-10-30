@@ -1,0 +1,185 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { createApp } from "../src/app.js";
+import { loadConfig } from "../src/config.js";
+import { signAdminCookie } from "../src/core/admin-auth.js";
+import { BotsRepo, type NewBot } from "../src/db/bots-repo.js";
+import { openDatabase } from "../src/db/database.js";
+import { adminRoutes } from "../src/routes/admin.js";
+import { Hono } from "hono";
+
+const ID = "AbCdEfGhIjKlMnOpQrStU";
+const TOKEN = "s3cret-token";
+const SALT = "test-salt";
+
+function mk(name: string, extra: Partial<NewBot> = {}): NewBot {
+  return {
+    name,
+    tagline: `${name} tagline`,
+    descriptionMd: "Does things.",
+    category: "engineering",
+    tags: ["a"],
+    authorName: "Ann",
+    authorUrl: null,
+    avatarShape: "pebble",
+    avatarColor: "magenta",
+    imageUrl: null,
+    templateId: ID,
+    recipe: null,
+    sourceUrl: null,
+    homepageUrl: null,
+    ...extra,
+  };
+}
+
+let repo: BotsRepo;
+let pendingSlug: string;
+let liveSlug: string;
+
+function app(adminToken: string | null = TOKEN, fetchImpl?: typeof fetch) {
+  const config = { ...loadConfig({ BOTMARKET_SITE_NAME: "Test Market" }), adminToken };
+  const deps = { repo, config, salt: SALT };
+  if (!fetchImpl) return createApp(deps);
+  const a = new Hono();
+  a.route("/", adminRoutes(deps, fetchImpl));
+  return a;
+}
+
+const cookie = () => ({ cookie: `bm_admin=${signAdminCookie(TOKEN, SALT)}` });
+const bearer = { authorization: `Bearer ${TOKEN}` };
+const post = (headers: Record<string, string>, body?: Record<string, string>): RequestInit => ({
+  method: "POST",
+  headers,
+  body: body ? new URLSearchParams(body) : undefined,
+});
+
+function catalog(n: number) {
+  return {
+    format: "botmarket-catalog/v1",
+    generatedAt: "2026-01-01T00:00:00.000Z",
+    site: { name: "Other", url: null },
+    bots: Array.from({ length: n }, (_, i) => ({
+      slug: `imp-${i}`,
+      name: `Imported ${i}`,
+      tagline: "t",
+      descriptionMd: "d",
+      category: "engineering",
+      tags: [],
+      authorName: "Zed",
+      authorUrl: null,
+      avatarShape: null,
+      avatarColor: null,
+      imageUrl: null,
+      templateId: ID,
+      recipe: null,
+      sourceUrl: null,
+      homepageUrl: null,
+    })),
+  };
+}
+const fakeFetch = (body: string, ok = true) =>
+  (async () => new Response(body, { status: ok ? 200 : 500 })) as unknown as typeof fetch;
+
+beforeEach(() => {
+  repo = new BotsRepo(openDatabase(":memory:"));
+  pendingSlug = repo.insert(mk("Pending Bot", { status: "pending" })).slug;
+  liveSlug = repo.insert(mk("Live Bot", { status: "published" })).slug;
+});
+
+describe("admin", () => {
+  it("404s without a configured token", async () => {
+    expect((await app(null).request("/admin")).status).toBe(404);
+    expect((await app(null).request("/admin/export")).status).toBe(404);
+  });
+
+  it("shows login page", async () => {
+    const res = await app().request("/admin");
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('name="token"');
+  });
+
+  it("rejects wrong token and sets cookie for right one", async () => {
+    const bad = await app().request("/admin/login", post({}, { token: "nope" }));
+    expect(bad.status).toBe(401);
+    const ok = await app().request("/admin/login", post({}, { token: TOKEN }));
+    expect(ok.status).toBe(303);
+    expect(ok.headers.get("location")).toBe("/admin");
+    const sc = ok.headers.get("set-cookie") ?? "";
+    expect(sc).toContain(`bm_admin=${signAdminCookie(TOKEN, SALT)}`);
+    expect(sc).toContain("HttpOnly");
+    expect(sc).toContain("SameSite=Lax");
+  });
+
+  it("dashboard lists pending bots with cookie", async () => {
+    const res = await app().request("/admin", { headers: cookie() });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("Pending Bot");
+    expect(html).toContain("Live Bot");
+    expect(html).toContain(`/admin/bots/${pendingSlug}/approve`);
+  });
+
+  it("requires admin for actions", async () => {
+    const res = await app().request(`/admin/bots/${pendingSlug}/approve`, post({}));
+    expect(res.status).toBe(401);
+    expect(repo.get(pendingSlug)?.status).toBe("pending");
+  });
+
+  it("approves, features, unfeatures and deletes via Bearer", async () => {
+    const a = app();
+    let res = await a.request(`/admin/bots/${pendingSlug}/approve`, post(bearer));
+    expect(res.status).toBe(303);
+    expect(repo.get(pendingSlug)?.status).toBe("published");
+    await a.request(`/admin/bots/${liveSlug}/feature`, post(bearer));
+    expect(repo.get(liveSlug)?.featured).toBe(true);
+    await a.request(`/admin/bots/${liveSlug}/unfeature`, post(bearer));
+    expect(repo.get(liveSlug)?.featured).toBe(false);
+    res = await a.request(`/admin/bots/${liveSlug}/delete`, post(bearer));
+    expect(res.status).toBe(303);
+    expect(repo.get(liveSlug)).toBeNull();
+  });
+
+  it("404s unknown slug", async () => {
+    const res = await app().request("/admin/bots/nope/approve", post(bearer));
+    expect(res.status).toBe(404);
+  });
+
+  it("imports a catalog through the injected fetch", async () => {
+    const a = app(TOKEN, fakeFetch(JSON.stringify(catalog(2))));
+    const res = await a.request("/admin/import", post(cookie(), { url: "https://other.example/catalog.json" }));
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("Imported 2");
+    expect(html).toContain("2 new");
+    expect(repo.get("imp-0")).not.toBeNull();
+    expect(repo.get("imp-1")).not.toBeNull();
+    const again = await a.request("/admin/import", post(bearer, { url: "https://other.example/catalog.json" }));
+    expect(await again.text()).toContain("2 updated");
+  });
+
+  it("rejects non-https import urls and bad catalogs", async () => {
+    const a = app(TOKEN, fakeFetch("{}"));
+    expect((await a.request("/admin/import", post(cookie(), { url: "http://x.example/c.json" }))).status).toBe(400);
+    const bad = await a.request("/admin/import", post(cookie(), { url: "https://x.example/c.json" }));
+    expect(bad.status).toBe(400);
+  });
+
+  it("blocks cross-site posts with cookie auth", async () => {
+    const res = await app().request(
+      `/admin/bots/${pendingSlug}/approve`,
+      post({ ...cookie(), "sec-fetch-site": "cross-site" }),
+    );
+    expect(res.status).toBe(403);
+    const res2 = await app().request(
+      `/admin/bots/${pendingSlug}/approve`,
+      post({ ...cookie(), origin: "https://evil.example" }),
+    );
+    expect(res2.status).toBe(403);
+    expect(repo.get(pendingSlug)?.status).toBe("pending");
+  });
+
+  it("redirects export to catalog.json", async () => {
+    const res = await app().request("/admin/export", { headers: cookie() });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/catalog.json");
+  });
+});
