@@ -14,6 +14,14 @@ describe('buildRecipeInstallPrompt', () => {
     expect(p).toContain('https://x.test/r.json');
     expect(p).toContain('Release Bot');
     expect(p).toMatch(/paused/);
+    expect(p).toMatch(/Fetch the JSON/);
+    expect(p).toMatch(/memories, skills, routines and plugins/);
+    expect(p).toMatch(/ask me whether to continue/);
+    expect(p).toMatch(/Do not write anything until I answer yes/);
+    expect(p).toMatch(/journal memory/);
+    expect(p).toMatch(/one single question/);
+    expect(p).toMatch(/Never install plugins or MCP servers silently/);
+    expect(p).toMatch(/ready/);
   });
   it('truncates an overlong name with an ellipsis, never the url', () => {
     const recipeUrl = 'https://example.com/' + 'a'.repeat(280);
@@ -21,6 +29,13 @@ describe('buildRecipeInstallPrompt', () => {
     expect(p.length).toBeLessThanOrEqual(MAX_PROMPT_LENGTH);
     expect(p).toContain(recipeUrl);
     expect(p).toContain('…');
+  });
+});
+
+describe('buildRecipeInstallPrompt limits', () => {
+  it('throws RangeError when the url is too long even with a truncated name', () => {
+    const recipeUrl = 'https://example.com/' + 'a'.repeat(930);
+    expect(() => buildRecipeInstallPrompt({ recipeUrl, name: 'Bot' })).toThrow(RangeError);
   });
 });
 

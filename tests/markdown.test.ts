@@ -15,7 +15,9 @@ describe('renderMarkdown', () => {
     expect(out).toContain('target="_blank"');
   });
   it('drops javascript: hrefs', () => {
-    expect(renderMarkdown('[a](javascript:alert(1))')).not.toContain('javascript:');
+    const out = renderMarkdown('[click](javascript:alert(1))');
+    expect(out).not.toContain('javascript:');
+    expect(out).toContain('click');
   });
   it('downgrades h1 to h2', () => {
     const out = renderMarkdown('# Title');
