@@ -13,13 +13,17 @@ export interface AppDeps {
   salt?: string;
   /** Shared limiter for bot submissions (web form and JSON API); defaults to 10/hour per IP. */
   submitLimiter?: RateLimiter;
+  /** Limiter for /submit/lookup, which fetches from x.ai; defaults to 30 per 10 minutes per IP. */
+  lookupLimiter?: RateLimiter;
 }
 
-export type ResolvedDeps = AppDeps & Required<Pick<AppDeps, 'fetchMetadata' | 'now' | 'salt' | 'submitLimiter'>>;
+export type ResolvedDeps = AppDeps & Required<Pick<AppDeps, 'fetchMetadata' | 'now' | 'salt' | 'submitLimiter' | 'lookupLimiter'>>;
 
 const PROCESS_SALT = randomBytes(16).toString('hex');
 export const SUBMIT_LIMIT = 10;
 export const SUBMIT_WINDOW_MS = 60 * 60 * 1000;
+export const LOOKUP_LIMIT = 30;
+export const LOOKUP_WINDOW_MS = 10 * 60 * 1000;
 
 /** Fill in defaults. Idempotent: resolving resolved deps returns the same values (and the same limiter). */
 export function resolveDeps(deps: AppDeps): ResolvedDeps {
@@ -29,5 +33,6 @@ export function resolveDeps(deps: AppDeps): ResolvedDeps {
     now: deps.now ?? (() => new Date()),
     salt: deps.salt ?? PROCESS_SALT,
     submitLimiter: deps.submitLimiter ?? new RateLimiter(SUBMIT_LIMIT, SUBMIT_WINDOW_MS),
+    lookupLimiter: deps.lookupLimiter ?? new RateLimiter(LOOKUP_LIMIT, LOOKUP_WINDOW_MS),
   };
 }

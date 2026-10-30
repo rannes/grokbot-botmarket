@@ -19,7 +19,8 @@ const text = (min: number, max: number) =>
 
 const optShort = z.preprocess(blankToNull, z.string().max(32, 'must be at most 32 characters').nullable());
 
-function isHttpsUrl(s: string): boolean {
+/** True for absolute https:// URLs without credentials. */
+export function isHttpsUrl(s: string): boolean {
   if (!URL.canParse(s)) return false;
   const u = new URL(s);
   return u.protocol === 'https:' && u.hostname !== '' && !u.username && !u.password;

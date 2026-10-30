@@ -10,6 +10,11 @@ export interface Config {
   publicUrl: string | null;
   /** Seed the database with seed/catalog.json when it is empty. */
   seed: boolean;
+  /**
+   * Trust x-forwarded-for / x-forwarded-host / x-forwarded-proto (BOTMARKET_TRUST_PROXY).
+   * Only enable behind a reverse proxy that overwrites these headers.
+   */
+  trustProxy: boolean;
 }
 
 function parseBool(value: string | undefined, fallback: boolean): boolean {
@@ -44,5 +49,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     siteName: nonEmpty(env.BOTMARKET_SITE_NAME) ?? "BotMarket",
     publicUrl: publicUrl ? publicUrl.replace(/\/+$/, "") : null,
     seed: parseBool(env.BOTMARKET_SEED, true),
+    trustProxy: parseBool(env.BOTMARKET_TRUST_PROXY, false),
   };
 }

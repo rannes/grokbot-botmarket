@@ -101,6 +101,18 @@ describe("security and static", () => {
     expect(await js.text()).toContain("data-copy");
   });
 
+  it("serves the default og image as a 1200x630 PNG", async () => {
+    const res = await app().request("/static/og-default.png");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    expect(res.headers.get("cache-control")).toBe("public, max-age=86400");
+    const buf = Buffer.from(await res.arrayBuffer());
+    expect(buf.subarray(0, 8)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    expect(buf.toString("ascii", 12, 16)).toBe("IHDR");
+    expect(buf.readUInt32BE(16)).toBe(1200);
+    expect(buf.readUInt32BE(20)).toBe(630);
+  });
+
   it("renders a 404 page for unknown routes", async () => {
     const res = await app().request("/nope/nope");
     expect(res.status).toBe(404);
@@ -154,8 +166,8 @@ describe("bot detail", () => {
     const res = await app().request("/bots/release-notes-bot");
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain(`grokbot://app/v1/bot-template?id=${ID}`);
-    expect(html).toContain(`https://cursor.com/grok-bot/link/v1/bot-template?id=${ID}`);
+    expect(html).toContain(`href="grokbot://app/v1/bot-template?id=${ID}"`);
+    expect(html).toContain(`href="https://cursor.com/grok-bot/link/v1/bot-template?id=${ID}"`);
     expect(html).toContain(`href="https://x.ai/bot/${ID}"`);
     expect(html).toContain('href="/add/release-notes-bot"');
     expect(html).toContain("Add to Grok Bot");
@@ -163,6 +175,7 @@ describe("bot detail", () => {
     expect(html).toContain('<meta property="og:title" content="Release Notes Bot"');
     expect(html).toContain('<meta property="og:image" content="https://img.example/a.png"');
     expect(html).toContain('content="summary_large_image"');
+    expect(html).toContain('<meta property="og:type" content="website"');
     expect(html).toContain("<strong>helps</strong>");
     expect(html).toContain('href="https://ann.example"');
     expect(html).toContain(
@@ -171,10 +184,13 @@ describe("bot detail", () => {
     expect(html).toContain("Nothing is added until you confirm inside Grok Bot.");
   });
 
-  it("omits og:image without an image", async () => {
+  it("falls back to the default og:image without an image", async () => {
     const html = await (await app().request("/bots/release-notes-bot")).text();
-    expect(html).not.toContain("og:image");
-    expect(html).not.toContain("twitter:card");
+    expect(html).toContain('<meta property="og:image" content="https://market.example/static/og-default.png"');
+    expect(html).toContain('<meta name="twitter:card" content="summary_large_image"');
+    const home = await (await app().request("/")).text();
+    expect(home).toContain('<meta property="og:image" content="https://market.example/static/og-default.png"');
+    expect(home).toContain('<meta property="og:type" content="website"');
   });
 
   it("404s for unknown and pending bots", async () => {
@@ -208,8 +224,19 @@ describe("bot detail", () => {
     expect(html).not.toContain('"><img src=x>');
   });
 
-  it("uses forwarded headers for the origin when publicUrl is unset", async () => {
+  it("ignores forwarded headers for the origin by default", async () => {
     config = { ...config, publicUrl: null };
+    const html = await (
+      await app().request("/bots/release-notes-bot", {
+        headers: { "x-forwarded-proto": "https", "x-forwarded-host": "evil.example" },
+      })
+    ).text();
+    expect(html).not.toContain("evil.example");
+    expect(html).toContain('<meta property="og:url" content="http://localhost/bots/release-notes-bot"');
+  });
+
+  it("uses forwarded headers for the origin when publicUrl is unset and trustProxy is on", async () => {
+    config = { ...config, publicUrl: null, trustProxy: true };
     const html = await (
       await app().request("/bots/release-notes-bot", {
         headers: { "x-forwarded-proto": "https", "x-forwarded-host": "bots.example.org" },
@@ -286,6 +313,65 @@ describe("submit", () => {
     expect(html).toContain('value="Kept Author"');
     expect(html).toContain("av av-teardrop av-orange");
     expect(html).toContain(`value="https://x.ai/bot/${ID}"`);
+  });
+
+  it("lookup drops a non-https image URL from x.ai metadata", async () => {
+    const fetchMetadata = async (id: string) => ({
+      id,
+      name: "Fetched Name",
+      description: "",
+      avatarShape: null,
+      avatarColor: null,
+      imageUrl: "http://insecure.example/og.png",
+      published: true,
+    });
+    const html = await (await app({ fetchMetadata }).request("/submit/lookup", form({ ref: ID }))).text();
+    expect(html).toContain('value="Fetched Name"');
+    expect(html).not.toContain("insecure.example");
+  });
+
+  it("Fill in from recipe uses the recipe even when a template link is also filled", async () => {
+    let called = false;
+    const fetchMetadata = async () => ((called = true), null);
+    const res = await app({ fetchMetadata }).request(
+      "/submit/lookup",
+      form({ ref: ID, lookup: "recipe", recipeText: JSON.stringify(recipe()) }),
+    );
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(called).toBe(false);
+    expect(html).toContain('value="Notes Keeper"');
+    expect(html).toContain("Filled in from the recipe");
+    expect(html).toContain(`value="${ID}"`);
+  });
+
+  it("Look up uses the template link even when a recipe is also filled", async () => {
+    const seen: string[] = [];
+    const fetchMetadata = async (id: string) => (seen.push(id), null);
+    await app({ fetchMetadata }).request(
+      "/submit/lookup",
+      form({ ref: ID, lookup: "template", recipeText: JSON.stringify(recipe()) }),
+    );
+    expect(seen).toEqual([ID]);
+  });
+
+  it("Fill in from recipe without a recipe asks for one", async () => {
+    const res = await app().request("/submit/lookup", form({ ref: "", lookup: "recipe", recipeText: " " }));
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("Paste a recipe first");
+  });
+
+  it("rate limits lookups per client IP and keeps the form values", async () => {
+    let calls = 0;
+    const fetchMetadata = async () => (calls++, null);
+    const a = app({ fetchMetadata, lookupLimiter: new RateLimiter(1, 60_000) });
+    expect((await a.request("/submit/lookup", form({ ref: ID }))).status).toBe(200);
+    const res = await a.request("/submit/lookup", form({ ref: ID, authorName: "Kept Author" }));
+    expect(res.status).toBe(429);
+    const html = await res.text();
+    expect(html).toContain("Too many lookups");
+    expect(html).toContain('value="Kept Author"');
+    expect(calls).toBe(1);
   });
 
   it("lookup failure renders the form with a warning", async () => {
@@ -372,18 +458,39 @@ describe("submit", () => {
     expect(await page.text()).toContain("approv");
   });
 
-  it("rate limits submissions per client IP", async () => {
+  it("rate limits submissions per forwarded IP when trustProxy is on", async () => {
+    config = { ...config, trustProxy: true };
     const a = app({ submitLimiter: new RateLimiter(1, 60_000) });
     const headers = { "x-forwarded-for": "203.0.113.9, 10.0.0.1" };
     const first = await a.request("/submit", { ...form(validSubmission), headers });
     expect(first.status).toBe(303);
     const second = await a.request("/submit", { ...form({ ...validSubmission, name: "Another" }), headers });
     expect(second.status).toBe(429);
+    const limited = await second.text();
+    expect(limited).toContain("Too many submissions");
+    expect(limited).toContain('value="Another"');
+    expect(limited).toContain('<form class="submit-form"');
     expect(repo.get("another")).toBeNull();
     const other = await a.request("/submit", {
       ...form({ ...validSubmission, name: "Third" }),
       headers: { "x-forwarded-for": "198.51.100.1" },
     });
+    expect(other.status).toBe(303);
+  });
+
+  it("ignores x-forwarded-for by default and limits by socket address", async () => {
+    const a = app({ submitLimiter: new RateLimiter(1, 60_000) });
+    const first = await a.request("/submit", { ...form(validSubmission), headers: { "x-forwarded-for": "203.0.113.9" } });
+    expect(first.status).toBe(303);
+    // a spoofed forwarded IP does not get a fresh budget
+    const spoofed = await a.request("/submit", {
+      ...form({ ...validSubmission, name: "Spoofed" }),
+      headers: { "x-forwarded-for": "198.51.100.77" },
+    });
+    expect(spoofed.status).toBe(429);
+    // a different socket address does
+    const env = { incoming: { socket: { remoteAddress: "192.0.2.44" } } };
+    const other = await a.request("/submit", form({ ...validSubmission, name: "Other Socket" }), env);
     expect(other.status).toBe(303);
   });
 });

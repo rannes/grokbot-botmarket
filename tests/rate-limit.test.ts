@@ -43,4 +43,23 @@ describe("RateLimiter", () => {
     rl.prune(1000);
     expect(rl.size).toBe(0);
   });
+
+  it("caps tracked keys and evicts the least recently used key", () => {
+    const rl = new RateLimiter(1, 60_000, 3);
+    expect(rl.allow("a", 0)).toBe(true);
+    expect(rl.allow("b", 1)).toBe(true);
+    expect(rl.allow("c", 2)).toBe(true);
+    expect(rl.allow("a", 3)).toBe(false); // touches a, so b is now the oldest
+    expect(rl.allow("d", 4)).toBe(true);
+    expect(rl.size).toBe(3);
+    expect(rl.allow("b", 5)).toBe(true); // b was evicted, so it starts fresh
+    expect(rl.allow("a", 6)).toBe(false);
+    expect(rl.size).toBe(3);
+  });
+
+  it("defaults to 10 000 tracked keys", () => {
+    const rl = new RateLimiter(1, 60_000);
+    for (let i = 0; i < 10_050; i++) rl.allow(`k${i}`, 0);
+    expect(rl.size).toBe(10_000);
+  });
 });

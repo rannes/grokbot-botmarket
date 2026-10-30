@@ -33,6 +33,7 @@ export function Layout({ title, description, siteName, ogImage, ogUrl, current, 
         <meta name="color-scheme" content="light dark" />
         <title>{fullTitle}</title>
         {description ? <meta name="description" content={description} /> : null}
+        <meta property="og:type" content="website" />
         <meta property="og:site_name" content={siteName} />
         <meta property="og:title" content={title} />
         {description ? <meta property="og:description" content={description} /> : null}

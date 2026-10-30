@@ -5,6 +5,7 @@ import { adminRoutes } from './routes/admin.js';
 import { apiRoutes } from './routes/api.js';
 import { installRoutes } from './routes/install.js';
 import { pagesRoutes } from './routes/pages.js';
+import { OG_DEFAULT_PATH } from './routes/shared.js';
 import { submitRoutes } from './routes/submit.js';
 import { avatarColorCss } from './views/components.js';
 import { MessagePage, NotFoundPage, sendPage } from './views/layout.js';
@@ -22,7 +23,9 @@ const CSP = [
 // Read once at startup. The build copies src/public to dist/public, so this resolves in dev and prod.
 const STYLES = `${readFileSync(new URL('./public/styles.css', import.meta.url), 'utf8')}\n${avatarColorCss()}`;
 const SCRIPT = readFileSync(new URL('./public/app.js', import.meta.url), 'utf8');
+const OG_PNG = new Uint8Array(readFileSync(new URL('./public/og-default.png', import.meta.url)));
 const STATIC_CACHE = 'public, max-age=3600';
+const IMAGE_CACHE = 'public, max-age=86400';
 
 export function createApp(deps: AppDeps): Hono {
   const d = resolveDeps(deps);
@@ -37,12 +40,20 @@ export function createApp(deps: AppDeps): Hono {
     h.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   });
 
+  // Lets clientIp/requestOrigin honour config.trustProxy even when a route calls them without config.
+  app.use('*', async (c, next) => {
+    c.set('trustProxy', d.config.trustProxy === true);
+    await next();
+  });
+
   app.get('/static/styles.css', (c) =>
     c.body(STYLES, 200, { 'Content-Type': 'text/css; charset=utf-8', 'Cache-Control': STATIC_CACHE }),
   );
   app.get('/static/app.js', (c) =>
     c.body(SCRIPT, 200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': STATIC_CACHE }),
   );
+
+  app.get(OG_DEFAULT_PATH, (c) => c.body(OG_PNG, 200, { 'Content-Type': 'image/png', 'Cache-Control': IMAGE_CACHE }));
 
   app.route('/', pagesRoutes(d));
   app.route('/', submitRoutes(d));

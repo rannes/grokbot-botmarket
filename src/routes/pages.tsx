@@ -16,7 +16,7 @@ import {
   plural,
 } from '../views/components.js';
 import { Layout, NotFoundPage, sendPage } from '../views/layout.js';
-import { requestOrigin } from './shared.js';
+import { defaultOgImage, requestOrigin } from './shared.js';
 
 export const PITCH = 'Bots for Grok Bot, shared by people like you. One click adds a bot to your app.';
 const HOME_LIMIT = 48;
@@ -182,7 +182,14 @@ export function pagesRoutes(deps: AppDeps): Hono {
     const lineup = [...featured, ...bots].filter((b, i, all) => all.findIndex((x) => x.slug === b.slug) === i).slice(0, 6);
     return sendPage(
       c,
-      <Layout title={siteName} description={PITCH} siteName={siteName} ogUrl={`${origin}/`} current="browse">
+      <Layout
+        title={siteName}
+        description={PITCH}
+        siteName={siteName}
+        ogUrl={`${origin}/`}
+        ogImage={defaultOgImage(origin)}
+        current="browse"
+      >
         <section class="hero">
           <div class="hero-text">
             <h1>{siteName}</h1>
@@ -233,7 +240,7 @@ export function pagesRoutes(deps: AppDeps): Hono {
         description={bot.tagline}
         siteName={siteName}
         ogUrl={`${origin}${botPath(bot.slug)}`}
-        ogImage={bot.imageUrl}
+        ogImage={bot.imageUrl ?? defaultOgImage(origin)}
       >
         <BotDetail bot={bot} origin={origin} />
       </Layout>,
@@ -254,6 +261,7 @@ export function pagesRoutes(deps: AppDeps): Hono {
         description={`${label} bots for Grok Bot on ${siteName}.`}
         siteName={siteName}
         ogUrl={`${origin}/c/${category}`}
+        ogImage={defaultOgImage(origin)}
         current="browse"
       >
         <section class="page-head">

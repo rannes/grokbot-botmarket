@@ -775,6 +775,22 @@ summary {
   word-break: break-all;
 }
 
+.copyfield-link {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  text-decoration: none;
+}
+
+.copyfield-link code {
+  flex: 1;
+}
+
+.copyfield-link:hover code {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
 .bot-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 19rem;

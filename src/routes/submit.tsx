@@ -5,7 +5,7 @@ import { CATEGORIES } from '../core/categories.js';
 import { parseRecipeText } from '../core/recipe.js';
 import { slugify } from '../core/slug.js';
 import { parseTemplateRef } from '../core/template-link.js';
-import { botFromInput } from '../core/validation.js';
+import { botFromInput, isHttpsUrl } from '../core/validation.js';
 import { resolveDeps, type AppDeps } from '../deps.js';
 import { BotAvatar, botPath } from '../views/components.js';
 import { Layout, MessagePage, sendPage } from '../views/layout.js';
@@ -84,6 +84,8 @@ interface FormProps {
   requireApproval: boolean;
   values: Values;
   errors?: string[];
+  /** Heading above the error list. */
+  errorTitle?: string;
   warning?: string;
   notice?: string;
 }
@@ -114,7 +116,7 @@ function Field({
   );
 }
 
-function SubmitPage({ siteName, requireApproval, values: v, errors = [], warning, notice }: FormProps) {
+function SubmitPage({ siteName, requireApproval, values: v, errors = [], errorTitle, warning, notice }: FormProps) {
   const bad = new Set(errors.map(errorField).filter((k): k is string => k !== null));
   if (bad.has('templateRef')) bad.add('ref');
   if (bad.has('recipe')) bad.add('recipeText');
@@ -135,7 +137,7 @@ function SubmitPage({ siteName, requireApproval, values: v, errors = [], warning
       </section>
       {errors.length > 0 ? (
         <div class="alert alert-error" role="alert">
-          <p class="alert-title">Fix these before publishing:</p>
+          <p class="alert-title">{errorTitle ?? 'Fix these before publishing:'}</p>
           <ul>
             {errors.map((e) => (
               <li>{friendlyError(e)}</li>
@@ -302,17 +304,25 @@ export function submitRoutes(deps: AppDeps): Hono {
     onError: (c) => sendPage(c, <MessagePage siteName={siteName} title="That’s too big"><p class="lede">The form was larger than 6 MB. Recipes can be at most 2 MB.</p></MessagePage>, 413),
   });
 
-  const form = (c: Context, props: Omit<FormProps, 'siteName' | 'requireApproval'>, status: 200 | 400 = 200) =>
+  const form = (c: Context, props: Omit<FormProps, 'siteName' | 'requireApproval'>, status: 200 | 400 | 429 = 200) =>
     sendPage(c, <SubmitPage siteName={siteName} requireApproval={config.requireApproval} {...props} />, status);
 
   app.get('/submit', (c) => form(c, { values: {} }));
 
   app.post('/submit/lookup', limit, async (c) => {
-    const values = readValues(await c.req.parseBody());
+    const body = await c.req.parseBody();
+    const values = readValues(body);
+    if (!d.lookupLimiter.allow(clientIp(c), d.now().getTime())) {
+      const errors = ['Too many lookups from your network. Wait a few minutes, or fill in the details by hand.'];
+      return form(c, { values, errors, errorTitle: 'Lookup paused' }, 429);
+    }
     const ref = values.ref?.trim() ?? '';
     const recipeText = values.recipeText?.trim() ?? '';
+    // Which button was pressed; without one (older clients), a lone recipe means a recipe lookup.
+    const mode = body.lookup === 'recipe' || body.lookup === 'template' ? body.lookup : ref === '' && recipeText !== '' ? 'recipe' : 'template';
 
-    if (ref === '' && recipeText !== '') {
+    if (mode === 'recipe') {
+      if (recipeText === '') return form(c, { values, errors: ['Paste a recipe first'] }, 400);
       const parsed = parseRecipeText(recipeText);
       if (!parsed.ok) {
         const errors = parsed.errors.map((e) => (e.startsWith('recipe:') ? e : `recipe: ${e}`));
@@ -349,23 +359,18 @@ export function submitRoutes(deps: AppDeps): Hono {
         descriptionMd: values.descriptionMd?.trim() ? values.descriptionMd : meta.description,
         avatarShape: meta.avatarShape ?? values.avatarShape,
         avatarColor: meta.avatarColor ?? values.avatarColor,
-        imageUrl: meta.imageUrl ?? values.imageUrl,
+        imageUrl: meta.imageUrl && isHttpsUrl(meta.imageUrl) ? meta.imageUrl : values.imageUrl,
       },
       notice: 'Filled in from x.ai. Check the details, then publish.',
     });
   });
 
   app.post('/submit', limit, async (c) => {
-    if (!d.submitLimiter.allow(clientIp(c), d.now().getTime())) {
-      return sendPage(
-        c,
-        <MessagePage siteName={siteName} title="Too many submissions">
-          <p class="lede">You’ve sent a lot of bots in the last hour. Try again later.</p>
-        </MessagePage>,
-        429,
-      );
-    }
     const values = readValues(await c.req.parseBody());
+    if (!d.submitLimiter.allow(clientIp(c), d.now().getTime())) {
+      const errors = ['Too many submissions from your network in the last hour. Try again later; your details are still here.'];
+      return form(c, { values, errors, errorTitle: 'Not sent yet' }, 429);
+    }
     const { ref, ...rest } = values;
     const result = botFromInput({ ...rest, templateRef: ref });
     if (!result.ok) return form(c, { values, errors: result.errors }, 400);

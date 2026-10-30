@@ -123,12 +123,19 @@ export function CopyButton({
   );
 }
 
-export function CopyField({ label, value }: { label: string; value: string }) {
+/** A labelled value with a copy button. With `link`, the value is also a real link (works without JS). */
+export function CopyField({ label, value, link = false }: { label: string; value: string; link?: boolean }) {
   return (
     <div class="copyfield">
       <p class="copyfield-label">{label}</p>
       <div class="copyfield-row">
-        <code>{value}</code>
+        {link ? (
+          <a class="copyfield-link" href={value}>
+            <code>{value}</code>
+          </a>
+        ) : (
+          <code>{value}</code>
+        )}
         <CopyButton value={value} what={label.toLowerCase()} />
       </div>
     </div>
@@ -153,8 +160,8 @@ export function InstallButtons({ bot, origin }: { bot: Bot; origin: string }) {
         <p class="install-note">{INSTALL_NOTE}</p>
         <details class="other-ways">
           <summary>Other ways to add</summary>
-          <CopyField label="App link" value={templateDeepLink(id)} />
-          <CopyField label="Web link, opens the app when it’s installed" value={templateUniversalLink(id)} />
+          <CopyField label="App link" value={templateDeepLink(id)} link />
+          <CopyField label="Web link, opens the app when it’s installed" value={templateUniversalLink(id)} link />
           {bot.recipe ? (
             <p>
               <a href={recipePath(bot.slug)} download>

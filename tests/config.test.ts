@@ -11,6 +11,14 @@ describe("loadConfig", () => {
     expect(c.publicUrl).toBeNull();
     expect(c.dataDir).toBe("./data");
     expect(c.dbPath).toBe("data/botmarket.sqlite");
+    expect(c.trustProxy).toBe(false);
+  });
+
+  it("reads BOTMARKET_TRUST_PROXY", () => {
+    expect(loadConfig({ BOTMARKET_TRUST_PROXY: "true" }).trustProxy).toBe(true);
+    expect(loadConfig({ BOTMARKET_TRUST_PROXY: "1" }).trustProxy).toBe(true);
+    expect(loadConfig({ BOTMARKET_TRUST_PROXY: "no" }).trustProxy).toBe(false);
+    expect(loadConfig({ BOTMARKET_TRUST_PROXY: "maybe" }).trustProxy).toBe(false);
   });
 
   it("reads env overrides and strips trailing slash from public url", () => {
