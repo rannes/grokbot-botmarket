@@ -54,7 +54,7 @@ const post = (body: unknown, headers: Record<string, string> = {}): RequestInit 
 
 beforeEach(() => {
   repo = new BotsRepo(openDatabase(":memory:"));
-  config = { ...loadConfig({ BOTMARKET_SITE_NAME: "Test Market" }), publicUrl: "https://market.example" };
+  config = { ...loadConfig({ BOTMARKET_SITE_NAME: "Test Market" }), trustProxy: true, publicUrl: "https://market.example" };
   repo.insert(mk("Release Notes Bot"));
   repo.insert(mk("Recipe Bot", { templateId: null, recipe: recipe(), category: "sales" }));
   repo.insert(mk("Pending Bot", { status: "pending" }));
