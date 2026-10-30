@@ -8,3 +8,4 @@ data/
 coverage/
 .env
 .superpowers/
+.preview-data/

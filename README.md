@@ -2,7 +2,9 @@
 
 A self-hosted marketplace for [Grok Bot](https://x.ai/bot) bots. People publish a bot with a description of what it does; anyone can add it to their own Grok Bot with one click. Your team, community or company gets its own catalog, backed by a single SQLite file, with no external services.
 
-<!-- screenshot placeholder: docs/screenshot.png -->
+![BotMarket home page](docs/screenshot-home.jpg)
+
+![A recipe bot page with the one-click install buttons](docs/screenshot-bot.jpg)
 
 ## How the one-click add works
 
