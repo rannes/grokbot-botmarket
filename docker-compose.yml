@@ -1,0 +1,23 @@
+services:
+  botmarket:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - botmarket-data:/data
+    environment:
+      PORT: "3000"
+      BOTMARKET_DATA_DIR: /data
+      # Enables /admin. Generate one with: openssl rand -hex 24
+      # BOTMARKET_ADMIN_TOKEN: change-me
+      # Hold new submissions until an admin approves them.
+      # BOTMARKET_REQUIRE_APPROVAL: "true"
+      # BOTMARKET_SITE_NAME: BotMarket
+      # Recommended in production; used for absolute recipe and OpenGraph URLs.
+      # BOTMARKET_PUBLIC_URL: https://bots.example.com
+      # Seed example bots into an empty database.
+      # BOTMARKET_SEED: "true"
+    restart: unless-stopped
+
+volumes:
+  botmarket-data:

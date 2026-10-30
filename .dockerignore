@@ -1,0 +1,8 @@
+node_modules
+dist
+data
+.git
+.superpowers
+docs
+tests
+*.sqlite*
