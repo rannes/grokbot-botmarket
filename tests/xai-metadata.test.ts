@@ -86,6 +86,55 @@ describe('fetchTemplateMetadata', () => {
     expect(f).toHaveBeenCalledTimes(2);
   });
 
+  it('parses unquoted attribute values', async () => {
+    const f = makeFetch(async (url) =>
+      url === API_URL
+        ? new Response('x', { status: 500 })
+        : new Response('<meta property=og:title content=Foo>', { status: 200 }),
+    );
+    expect((await fetchTemplateMetadata(ID, f))?.name).toBe('Foo');
+  });
+
+  it('ignores og:title beyond the 512 KB cap', async () => {
+    const pad = 'a'.repeat(524288 + 10);
+    const html = `<p>${pad}</p><meta property="og:title" content="Late"/>`;
+    const f = makeFetch(async (url) =>
+      url === API_URL ? new Response('x', { status: 500 }) : new Response(html, { status: 200 }),
+    );
+    expect(await fetchTemplateMetadata(ID, f)).toBeNull();
+  });
+
+  it('parses og:title located before the cap in a large body', async () => {
+    const html = `<meta property="og:title" content="Early"/><p>${'a'.repeat(600000)}</p>`;
+    const f = makeFetch(async (url) =>
+      url === API_URL ? new Response('x', { status: 500 }) : new Response(html, { status: 200 }),
+    );
+    expect((await fetchTemplateMetadata(ID, f))?.name).toBe('Early');
+  });
+
+  it('does not double-decode entities', async () => {
+    const f = makeFetch(async (url) =>
+      url === API_URL
+        ? new Response('x', { status: 500 })
+        : new Response('<meta property="og:title" content="a &amp;lt; b">', { status: 200 }),
+    );
+    expect((await fetchTemplateMetadata(ID, f))?.name).toBe('a &lt; b');
+  });
+
+  it('returns null when page has no og:title', async () => {
+    const f = makeFetch(async (url) =>
+      url === API_URL ? new Response('x', { status: 500 }) : new Response('<html></html>', { status: 200 }),
+    );
+    expect(await fetchTemplateMetadata(ID, f)).toBeNull();
+  });
+
+  it('falls through to the page when API 200 lacks template', async () => {
+    const f = makeFetch(async (url) =>
+      url === API_URL ? new Response('{}', { status: 200 }) : new Response(PAGE_HTML, { status: 200 }),
+    );
+    expect((await fetchTemplateMetadata(ID, f))?.name).toBe('Outbound Prospecting');
+  });
+
   it('throws TypeError for an invalid id without calling fetch', async () => {
     const f = makeFetch(async () => new Response('', { status: 200 }));
     await expect(fetchTemplateMetadata('../evil', f)).rejects.toBeInstanceOf(TypeError);

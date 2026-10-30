@@ -1,7 +1,7 @@
 const TEMPLATE_ID_RE = /^[A-Za-z0-9_-]{21}$/;
 const API_URL = 'https://api2.cursor.sh/aiserver.v1.GrokBotService/GetPublicGrokBotTemplate';
 const TIMEOUT_MS = 5000;
-const MAX_BODY_CHARS = 524288;
+const MAX_BODY_BYTES = 524288;
 
 export interface TemplateMetadata {
   id: string;
@@ -52,13 +52,36 @@ function ogContent(html: string, prop: string): string | null {
   const tagRe = /<meta\b[^>]*>/gi;
   for (const m of html.matchAll(tagRe)) {
     const tag = m[0];
-    const p = /\bproperty\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(tag);
-    if ((p?.[1] ?? p?.[2]) !== prop) continue;
-    const c = /\bcontent\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(tag);
+    const p = /\bproperty\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/i.exec(tag);
+    if ((p?.[1] ?? p?.[2] ?? p?.[3]) !== prop) continue;
+    const c = /\bcontent\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/i.exec(tag);
     if (!c) continue;
-    return decodeEntities(c[1] ?? c[2] ?? '');
+    return decodeEntities(c[1] ?? c[2] ?? c[3] ?? '');
   }
   return null;
+}
+
+async function readCapped(res: Response): Promise<string> {
+  if (!res.body) return (await res.text()).slice(0, MAX_BODY_BYTES);
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (total < MAX_BODY_BYTES) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    total += value.byteLength;
+  }
+  await reader.cancel().catch(() => undefined);
+  const buf = new Uint8Array(Math.min(total, MAX_BODY_BYTES));
+  let off = 0;
+  for (const c of chunks) {
+    if (off >= buf.length) break;
+    const part = c.subarray(0, buf.length - off);
+    buf.set(part, off);
+    off += part.length;
+  }
+  return new TextDecoder().decode(buf);
 }
 
 async function fetchFromPage(id: string, fetchImpl: typeof fetch): Promise<TemplateMetadata | null> {
@@ -69,7 +92,7 @@ async function fetchFromPage(id: string, fetchImpl: typeof fetch): Promise<Templ
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!res.ok) return null;
-    const html = (await res.text()).slice(0, MAX_BODY_CHARS);
+    const html = await readCapped(res);
     const name = ogContent(html, 'og:title');
     if (!name) return null;
     return {
