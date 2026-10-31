@@ -16,6 +16,13 @@ export interface Config {
    * hop is used) and sets x-forwarded-proto / x-forwarded-host.
    */
   trustProxy: boolean;
+  /**
+   * Postgres connection string from BOTMARKET_DATABASE_URL, falling back to DATABASE_URL.
+   * Null when neither is set (SQLite is used).
+   */
+  databaseUrl: string | null;
+  /** "postgres" when BOTMARKET_DATABASE_URL or DATABASE_URL is set, otherwise "sqlite". */
+  databaseDriver: "sqlite" | "postgres";
 }
 
 function parseBool(value: string | undefined, fallback: boolean): boolean {
@@ -38,9 +45,21 @@ function nonEmpty(value: string | undefined): string | null {
   return v.length > 0 ? v : null;
 }
 
+function parseDatabaseUrl(env: NodeJS.ProcessEnv): string | null {
+  const name = nonEmpty(env.BOTMARKET_DATABASE_URL) !== null ? "BOTMARKET_DATABASE_URL" : "DATABASE_URL";
+  const value = nonEmpty(env[name]);
+  if (value === null) return null;
+  // Never include the value in the error: it may contain credentials.
+  if (!URL.canParse(value) || !["postgres:", "postgresql:"].includes(new URL(value).protocol.toLowerCase())) {
+    throw new Error(`${name} must be a postgres:// or postgresql:// URL`);
+  }
+  return value;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const dataDir = nonEmpty(env.BOTMARKET_DATA_DIR) ?? "./data";
   const publicUrl = nonEmpty(env.BOTMARKET_PUBLIC_URL);
+  const databaseUrl = parseDatabaseUrl(env);
   return {
     port: parsePort(env.PORT, 3000),
     dataDir,
@@ -51,5 +70,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     publicUrl: publicUrl ? publicUrl.replace(/\/+$/, "") : null,
     seed: parseBool(env.BOTMARKET_SEED, true),
     trustProxy: parseBool(env.BOTMARKET_TRUST_PROXY, false),
+    databaseUrl,
+    databaseDriver: databaseUrl === null ? "sqlite" : "postgres",
   };
 }
