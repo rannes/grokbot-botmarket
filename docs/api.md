@@ -153,9 +153,23 @@ The "Add to Grok Bot" SVG badge (`image/svg+xml`, cached for an hour). `404` if 
 [![Add to Grok Bot](https://YOUR-HOST/badge/SLUG.svg)](https://YOUR-HOST/add/SLUG)
 ```
 
+## `GET /api/status`
+
+Reports the version and database health. Sent with `Cache-Control: no-store`.
+
+```json
+{ "version": "1.2.3", "database": { "driver": "sqlite", "ok": true } }
+```
+
+`driver` is `sqlite` or `postgres`. When the database cannot be reached, the response is `503` with `"ok": false`; no error details are included.
+
+```json
+{ "version": "1.2.3", "database": { "driver": "postgres", "ok": false } }
+```
+
 ## `GET /healthz`
 
-Returns `200` with `{"ok":true}`. Used by the Docker healthcheck.
+Returns `200` with `{"ok":true,"database":{"driver":"sqlite","ok":true}}`. When the database cannot be reached it returns `503` with `{"ok":false,"database":{"driver":"sqlite","ok":false}}`. Used by the Docker healthcheck.
 
 ## Admin
 

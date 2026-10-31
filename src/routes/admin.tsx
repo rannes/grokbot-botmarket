@@ -68,6 +68,7 @@ function Dashboard({
   published,
   pendingCount,
   publishedCount,
+  driver,
   notice,
   errors,
 }: {
@@ -76,6 +77,7 @@ function Dashboard({
   published: Bot[];
   pendingCount: number;
   publishedCount: number;
+  driver: string;
   notice?: string;
   errors?: string[];
 }) {
@@ -83,6 +85,7 @@ function Dashboard({
     <Layout title="Admin" siteName={siteName}>
       <section class="page-head message">
         <h1>Admin</h1>
+        <p>Database: {driver}</p>
         {notice ? <p role="status">{notice}</p> : null}
         {errors && errors.length > 0 ? (
           <div role="alert">
@@ -188,6 +191,7 @@ export function adminRoutes(deps: AppDeps, fetchImpl: typeof fetch = fetch): Hon
         published={published}
         pendingCount={pendingCount}
         publishedCount={publishedCount}
+        driver={d.repo.driver}
         {...extra}
       />,
       status,

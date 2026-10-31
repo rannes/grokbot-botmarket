@@ -2,9 +2,10 @@ import { Hono } from 'hono';
 import { exportCatalog, toCatalogBot } from '../core/catalog.js';
 import { isCategory } from '../core/categories.js';
 import { botFromInput } from '../core/validation.js';
-import type { Bot } from '../db/bots-repo.js';
+import type { Bot, BotsRepo } from '../db/bots-repo.js';
 import { visitorHash } from '../db/visitor.js';
 import { resolveDeps, type AppDeps } from '../deps.js';
+import { VERSION } from '../version.js';
 import { clientIp, requestOrigin } from './shared.js';
 
 const SORTS = ['new', 'top', 'installs'] as const;
@@ -14,6 +15,16 @@ function intParam(v: string | undefined, def: number, min: number, max: number):
   if (v === undefined || v === '') return def;
   if (!/^\d+$/.test(v)) return null;
   return Math.min(max, Math.max(min, Number(v)));
+}
+
+/** Driver name and reachability only; the ping error is swallowed so nothing else about the database leaks. */
+async function databaseStatus(repo: BotsRepo): Promise<{ driver: BotsRepo['driver']; ok: boolean }> {
+  try {
+    await repo.ping();
+    return { driver: repo.driver, ok: true };
+  } catch {
+    return { driver: repo.driver, ok: false };
+  }
 }
 
 export function apiRoutes(deps: AppDeps): Hono {
@@ -85,7 +96,16 @@ export function apiRoutes(deps: AppDeps): Hono {
     return c.json(catalog, 200, { 'Cache-Control': 'public, max-age=300' });
   });
 
-  app.get('/healthz', (c) => c.json({ ok: true }));
+  app.get('/api/status', async (c) => {
+    const database = await databaseStatus(d.repo);
+    c.header('Cache-Control', 'no-store');
+    return c.json({ version: VERSION, database }, database.ok ? 200 : 503);
+  });
+
+  app.get('/healthz', async (c) => {
+    const database = await databaseStatus(d.repo);
+    return c.json({ ok: database.ok, database }, database.ok ? 200 : 503);
+  });
 
   return app;
 }

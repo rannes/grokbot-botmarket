@@ -249,6 +249,6 @@ describe("catalog and health", () => {
   });
   it("healthz", async () => {
     const res = await app().request("/healthz");
-    expect(await res.json()).toEqual({ ok: true });
+    expect(await res.json()).toEqual({ ok: true, database: { driver: "sqlite", ok: true } });
   });
 });

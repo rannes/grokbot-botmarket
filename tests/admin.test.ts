@@ -145,6 +145,7 @@ describe("admin", () => {
     const html = await res.text();
     expect(html).toContain("Pending Bot");
     expect(html).toContain("Live Bot");
+    expect(html).toContain("Database: sqlite");
     expect(html).toContain(`/admin/bots/${pendingSlug}/approve`);
   });
 
