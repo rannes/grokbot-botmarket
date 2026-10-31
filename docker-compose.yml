@@ -1,6 +1,10 @@
 services:
   botmarket:
+    # `docker compose up -d` pulls the prebuilt image. To run from this
+    # checkout instead: `docker compose up -d --build`.
+    image: ghcr.io/rannes/grokbot-botmarket:${BOTMARKET_IMAGE_TAG:-latest}
     build: .
+    pull_policy: missing
     ports:
       - "3000:3000"
     volumes:

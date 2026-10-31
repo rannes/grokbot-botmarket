@@ -35,18 +35,22 @@ cd grokbot-botmarket
 npm ci && npm run build && npm start
 ```
 
-With Docker:
+With Docker (prebuilt image, linux/amd64 and linux/arm64):
 
 ```sh
-docker build -t grokbot-botmarket .
 docker run -d --name botmarket -p 3000:3000 -v botmarket-data:/data \
   -e BOTMARKET_ADMIN_TOKEN=change-me \
   -e BOTMARKET_PUBLIC_URL=https://bots.example.com \
   -e BOTMARKET_SEED=false \
-  grokbot-botmarket
+  ghcr.io/rannes/grokbot-botmarket:latest
 ```
 
-With Docker Compose:
+Image tags: `latest` and `main` follow the main branch, `0.1.0` / `0.1` match
+release tags, and `sha-<commit>` pins an exact build. Pin a version in
+production. The image is built and pushed by [CI](.github/workflows/ci.yml)
+after the tests pass. To build it yourself: `docker build -t grokbot-botmarket .`
+
+With Docker Compose (uses the same image; add `--build` to run from your checkout):
 
 ```sh
 docker compose up -d
