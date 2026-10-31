@@ -97,6 +97,13 @@ describe('runCli', () => {
     expect(t.err.join('')).not.toContain('hunter2');
   });
 
+  it('serve exits 1 for a non-postgres DATABASE_URL without echoing it', async () => {
+    const t = io({ DATABASE_URL: 'mysql://u:secret@h/d' });
+    expect(await runCli(['serve'], t.io)).toBe(1);
+    expect(t.err.join('')).toContain('DATABASE_URL must be a postgres:// or postgresql:// URL');
+    expect(t.err.join('')).not.toContain('secret');
+  });
+
   it('export without a file writes the catalog to stdout', async () => {
     const env = { BOTMARKET_DATA_DIR: join(dir, 'data') };
     await runCli(['import', DEFAULT_SEED_PATH], io(env).io);

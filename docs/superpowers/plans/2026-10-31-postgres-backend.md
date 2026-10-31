@@ -24,7 +24,7 @@
 
 1. Concurrent requests on SQLite (25 parallel `recordEvent` calls): every call resolves, none rejects with "cannot start a transaction within a transaction", counter equals 25. Test in Task 2.
 2. `DATABASE_URL` set to blank, to `mysql://…`, or to `POSTGRESQL://…`: blank means SQLite, wrong scheme throws the exact message, uppercase scheme is accepted. Tests in Task 1.
-3. Postgres unreachable at `serve` start: exit code 1 and a message that does not contain the password or host from the URL. Test in Task 3.
+3. Postgres unreachable at `serve` start: exit code 1 and a message that does not contain the password from the URL. Test in Task 3.
 4. Search text containing `%`, `_` and `\`: matches only literal characters on both backends. Test in Task 2 (runs on Postgres via Task 3's backend helper).
 5. `/healthz` and `/api/status` when the database ping fails: 503 with `ok:false`, driver still reported. Test in Task 4.
 

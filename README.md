@@ -73,9 +73,9 @@ DATABASE_URL=postgres://botmarket:secret@db.example.com:5432/botmarket
 ```
 
 - Only `postgres://` and `postgresql://` URLs are accepted. Anything else stops startup with `<VAR> must be a postgres:// or postgresql:// URL`, where `<VAR>` is the variable that was read.
-- TLS follows the URL: `?sslmode=require` connects with TLS and verifies the server certificate, `?sslmode=no-verify` connects with TLS but skips verification, and no `sslmode` means no TLS.
+- TLS follows the URL: use `?sslmode=verify-full` to connect with TLS and verify the server certificate (`require` currently means the same but prints a deprecation warning); `?sslmode=no-verify` skips verification; no `sslmode` means no TLS.
 - Migrations run automatically at startup and are safe when several instances start at once.
-- Several instances can share one Postgres database, but rate limits and the admin cookie salt are per process: instances share data, not limits.
+- Several instances can share one Postgres database, but rate limits and the admin cookie salt are per process: instances share data, not limits. Install/upvote de-duplication is also per process, so a click routed to two replicas can count twice.
 - Check which backend is running with `curl http://localhost:3000/api/status`:
 
 ```json

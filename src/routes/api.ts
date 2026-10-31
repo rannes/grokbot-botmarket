@@ -22,7 +22,8 @@ async function databaseStatus(repo: BotsRepo): Promise<{ driver: BotsRepo['drive
   try {
     await repo.ping();
     return { driver: repo.driver, ok: true };
-  } catch {
+  } catch (e) {
+    console.error('Database ping failed:', (e as Error).message);
     return { driver: repo.driver, ok: false };
   }
 }

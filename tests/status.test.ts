@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
 import { BotsRepo } from "../src/db/bots-repo.js";
@@ -30,6 +30,7 @@ describe("status", () => {
   });
 
   it("answers 503 when the database ping fails", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const broken = Object.create(repo) as BotsRepo;
     broken.ping = () => Promise.reject(new Error("connection refused"));
     const app2 = createApp({ repo: broken, config });
@@ -43,6 +44,8 @@ describe("status", () => {
     const healthText = await health.text();
     expect(JSON.parse(healthText)).toEqual({ ok: false, database: { driver: "sqlite", ok: false } });
     expect(healthText).not.toContain("connection refused");
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringMatching(/^Database ping failed:/), "connection refused");
+    errorSpy.mockRestore();
   });
 
   it("VERSION matches package.json", () => {
