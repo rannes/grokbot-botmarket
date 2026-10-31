@@ -62,6 +62,34 @@ Then open http://localhost:3000.
 
 By default (`BOTMARKET_SEED=true`) an empty database is seeded with 10 example bots. Set `BOTMARKET_SEED=false` for a clean production instance.
 
+## Database
+
+By default BotMarket stores everything in a single SQLite file, `botmarket.db` inside `BOTMARKET_DATA_DIR` (`./data`, or `/data` in Docker). No setup is needed.
+
+To use PostgreSQL instead, set `DATABASE_URL` (or `BOTMARKET_DATABASE_URL`, which takes precedence if both are set). A blank value counts as unset.
+
+```sh
+DATABASE_URL=postgres://botmarket:secret@db.example.com:5432/botmarket
+```
+
+- Only `postgres://` and `postgresql://` URLs are accepted. Anything else stops startup with `<VAR> must be a postgres:// or postgresql:// URL`, where `<VAR>` is the variable that was read.
+- TLS follows the URL: `?sslmode=require` connects with TLS and verifies the server certificate, `?sslmode=no-verify` connects with TLS but skips verification, and no `sslmode` means no TLS.
+- Migrations run automatically at startup and are safe when several instances start at once.
+- Several instances can share one Postgres database, but rate limits and the admin cookie salt are per process: instances share data, not limits.
+- Check which backend is running with `curl http://localhost:3000/api/status`:
+
+```json
+{"version":"0.1.0","database":{"driver":"postgres","ok":true}}
+```
+
+  It returns `503` with `"ok":false` when the database is unreachable. `/healthz` reports the same `database` object, so the Docker healthcheck fails when Postgres is down.
+
+To try Postgres with Docker Compose, add the override file. It starts a `postgres:17-alpine` service with a named volume and points `botmarket` at it:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+```
+
 ## Publishing a bot
 
 Open `/submit`.
@@ -108,6 +136,8 @@ Add this to your bot's README, replacing `YOUR-HOST` and `SLUG`:
 | `PORT` | `3000` | HTTP port. |
 | `HOST` | `0.0.0.0` | Interface to bind. |
 | `BOTMARKET_DATA_DIR` | `./data` | Directory for the SQLite database (`/data` in Docker). |
+| `BOTMARKET_DATABASE_URL` | unset | PostgreSQL connection URL (`postgres://` or `postgresql://`). Takes precedence over `DATABASE_URL`. When neither is set, SQLite is used. See [Database](#database). |
+| `DATABASE_URL` | unset | Same as `BOTMARKET_DATABASE_URL`, used when that is unset. |
 | `BOTMARKET_ADMIN_TOKEN` | unset | Enables `/admin` when set. Use a long random value. |
 | `BOTMARKET_REQUIRE_APPROVAL` | `false` | Hold new submissions as pending until approved. |
 | `BOTMARKET_SITE_NAME` | `BotMarket` | Name shown in the UI and OpenGraph tags. |
