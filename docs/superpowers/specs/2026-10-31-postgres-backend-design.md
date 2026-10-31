@@ -18,7 +18,8 @@ API endpoint reports which backend is active so an operator can confirm the conf
 - Migrations run automatically on startup for both backends and are safe when several instances
   start at once against the same Postgres.
 - Fail fast and clearly: a malformed URL stops startup with a message; an unreachable Postgres stops
-  `serve` with a message. The connection string is never printed or served.
+  `serve` with a message. The connection string and its password are never printed or served (the
+  driver's own startup error text may name the host, user or database so the failure is diagnosable).
 - `GET /api/status` reports the driver; `GET /healthz` reports it too and goes unhealthy when the
   database cannot be reached.
 
@@ -31,7 +32,8 @@ API endpoint reports which backend is active so an operator can confirm the conf
 
 ## Anti-goals
 
-- Leaking the URL, host, user or database name through the API, logs or error pages.
+- Leaking the URL or password anywhere, or any database detail beyond the driver name through the API
+  or error pages.
 - A SQLite regression: interleaved statements from concurrent requests must not land inside another
   request's open transaction.
 - Letting a bad `DATABASE_URL` silently fall back to SQLite. Set means Postgres or exit.
