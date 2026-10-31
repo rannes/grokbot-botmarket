@@ -90,6 +90,13 @@ describe('runCli', () => {
     expect(t.err.join('')).toContain('https');
   });
 
+  it('serve exits 1 without echoing the url when Postgres is unreachable', async () => {
+    const t = io({ DATABASE_URL: 'postgres://user:hunter2@127.0.0.1:1/db' });
+    expect(await runCli(['serve'], t.io)).toBe(1);
+    expect(t.err.join('')).toContain('Cannot connect to Postgres');
+    expect(t.err.join('')).not.toContain('hunter2');
+  });
+
   it('export without a file writes the catalog to stdout', async () => {
     const env = { BOTMARKET_DATA_DIR: join(dir, 'data') };
     await runCli(['import', DEFAULT_SEED_PATH], io(env).io);

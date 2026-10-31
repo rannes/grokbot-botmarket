@@ -93,25 +93,27 @@ CREATE TABLE settings (
   },
 ];
 
+/**
+ * Applies every missing migration in one transaction. Under Postgres the transaction first takes an
+ * advisory lock, so instances starting together against one database migrate one at a time: the
+ * later ones find schema_migrations (and every version) already there.
+ */
 export async function migrate(db: SqlDatabase): Promise<void> {
-  await db.exec(
-    "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)",
-  );
-  const applied = new Set(
-    (await db.all<{ version: number }>("SELECT version FROM schema_migrations")).map((r) => r.version),
-  );
-  for (const m of MIGRATIONS) {
-    if (applied.has(m.version)) continue;
-    await db.transaction(async (tx) => {
-      // Instances starting together against one Postgres apply migrations one at a time.
-      if (db.driver === "postgres") await tx.run("SELECT pg_advisory_xact_lock(1651668077)");
-      // Another instance may have applied it while this one waited for the lock.
-      if (await tx.get("SELECT 1 FROM schema_migrations WHERE version = ?", [m.version])) return;
+  await db.transaction(async (tx) => {
+    if (db.driver === "postgres") await tx.run("SELECT pg_advisory_xact_lock(1651668077)");
+    await tx.exec(
+      "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)",
+    );
+    const applied = new Set(
+      (await tx.all<{ version: number }>("SELECT version FROM schema_migrations")).map((r) => r.version),
+    );
+    for (const m of MIGRATIONS) {
+      if (applied.has(m.version)) continue;
       await tx.exec(db.driver === "postgres" ? m.postgres : m.sqlite);
       await tx.run("INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)", [
         m.version,
         new Date().toISOString(),
       ]);
-    });
-  }
+    }
+  });
 }

@@ -64,7 +64,11 @@ class SqliteDatabase implements SqlDatabase {
         this.db.exec("COMMIT");
         return value;
       } catch (e) {
-        this.db.exec("ROLLBACK");
+        try {
+          this.db.exec("ROLLBACK");
+        } catch {
+          /* e.g. SQLite already rolled back after the error; the body's error is the one worth reporting */
+        }
         throw e;
       }
     });

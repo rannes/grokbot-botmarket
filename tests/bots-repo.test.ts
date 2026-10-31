@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { BotsRepo, type NewBot } from "../src/db/bots-repo.js";
-import type { SqlDatabase } from "../src/db/sql.js";
+import type { SqlDatabase, SqlExecutor } from "../src/db/sql.js";
 import { visitorHash } from "../src/db/visitor.js";
 import { exportCatalog, parseCatalog } from "../src/core/catalog.js";
 import { testBackends } from "./helpers/backends.js";
@@ -226,6 +226,31 @@ describe.each(testBackends())("BotsRepo ($driver)", (backend) => {
       const n = await repo.upsertFromCatalog({ ...mk("New"), slug: "new" });
       expect(n.status).toBe("published");
       expect(n.featured).toBe(false);
+    });
+
+    it("concurrent inserts with the same name each get their own slug", async () => {
+      const bots = await Promise.all(Array.from({ length: 5 }, () => repo.insert(mk("Twin"))));
+      expect(bots.map((b) => b.slug).sort()).toEqual(["twin", "twin-2", "twin-3", "twin-4", "twin-5"]);
+      expect(await repo.count()).toBe(5);
+    });
+
+    it("recordEvent returns false and stores nothing when the bot is deleted after the existence check", async () => {
+      await repo.insert(mk("Gone"));
+      // The same database, except that the bot disappears just before recordEvent's transaction starts.
+      const racing = new Proxy(db, {
+        get(target, key) {
+          if (key === "transaction") {
+            return async <T>(fn: (tx: SqlExecutor) => Promise<T>): Promise<T> => {
+              await target.run("DELETE FROM bots WHERE slug = ?", ["gone"]);
+              return target.transaction(fn);
+            };
+          }
+          const value: unknown = Reflect.get(target, key);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+      expect(await new BotsRepo(racing, () => clock).recordEvent("gone", "install", "h")).toBe(false);
+      expect(await db.get("SELECT COUNT(*) AS n FROM events")).toEqual({ n: 0 });
     });
 
     it("q treats % and _ literally; empty slug is generated; limit is clamped", async () => {

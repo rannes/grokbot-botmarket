@@ -72,6 +72,12 @@ function fromRow(r: SqlRow): Bot {
   };
 }
 
+/** Tries per insert when concurrent inserts keep taking the chosen slug. */
+const MAX_INSERT_ATTEMPTS = 5;
+
+/** Thrown inside recordEvent's transaction to roll it back when the bot has been deleted. */
+class BotGone extends Error {}
+
 /** ORDER BY clauses; `tiebreak` is the insertion-order column (rowid in SQLite, id in Postgres). */
 function orderClauses(tiebreak: string): Record<NonNullable<ListOpts["sort"]>, string> {
   return {
@@ -196,9 +202,18 @@ export class BotsRepo {
   }
 
   async insert(bot: NewBot): Promise<Bot> {
-    const slug = await this.freeSlug(bot.slug || slugify(bot.name));
-    await this.writeNew(slug, bot);
-    return (await this.get(slug)) as Bot;
+    const base = bot.slug || slugify(bot.name);
+    for (let attempt = 1; ; attempt++) {
+      const slug = await this.freeSlug(base);
+      try {
+        await this.writeNew(slug, bot);
+      } catch (e) {
+        // A concurrent insert took the slug after freeSlug looked: pick the next free one.
+        if (attempt < MAX_INSERT_ATTEMPTS && (await this.exists(slug))) continue;
+        throw e;
+      }
+      return (await this.get(slug)) as Bot;
+    }
   }
 
   async update(slug: string, patch: Partial<NewBot>): Promise<Bot | null> {
@@ -236,8 +251,10 @@ export class BotsRepo {
 
   async delete(slug: string): Promise<boolean> {
     return this.db.transaction(async (tx) => {
-      await tx.run("DELETE FROM events WHERE slug = ?", [slug]);
+      // Bot row first: it waits for (or blocks) a concurrent recordEvent on the same row, so that
+      // event's row is either committed and deleted below or rolled back by recordEvent.
       const { changes } = await tx.run("DELETE FROM bots WHERE slug = ?", [slug]);
+      await tx.run("DELETE FROM events WHERE slug = ?", [slug]);
       return changes > 0;
     });
   }
@@ -260,18 +277,25 @@ export class BotsRepo {
 
   /** Counts one event per visitor, bot, kind and day. False for an unknown bot or a repeat. */
   async recordEvent(slug: string, kind: "install" | "upvote", visitorHash: string): Promise<boolean> {
-    if (!(await this.exists(slug))) return false;
+    if (!(await this.exists(slug))) return false; // fast path; the UPDATE below is the real check
     const day = this.now().toISOString().slice(0, 10);
     const col = kind === "install" ? "install_clicks" : "upvotes";
-    return this.db.transaction(async (tx) => {
-      const r = await tx.run(
-        "INSERT INTO events (slug, kind, visitor_hash, day) VALUES (?,?,?,?) ON CONFLICT DO NOTHING",
-        [slug, kind, visitorHash, day],
-      );
-      if (r.changes === 0) return false;
-      await tx.run(`UPDATE bots SET ${col} = ${col} + 1 WHERE slug = ?`, [slug]);
-      return true;
-    });
+    try {
+      return await this.db.transaction(async (tx) => {
+        const r = await tx.run(
+          "INSERT INTO events (slug, kind, visitor_hash, day) VALUES (?,?,?,?) ON CONFLICT DO NOTHING",
+          [slug, kind, visitorHash, day],
+        );
+        if (r.changes === 0) return false;
+        const u = await tx.run(`UPDATE bots SET ${col} = ${col} + 1 WHERE slug = ?`, [slug]);
+        // Deleted since the check above: throwing rolls the event row back.
+        if (u.changes === 0) throw new BotGone();
+        return true;
+      });
+    } catch (e) {
+      if (e instanceof BotGone) return false;
+      throw e;
+    }
   }
 
   async categoryCounts(): Promise<Record<Category, number>> {
