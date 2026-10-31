@@ -26,11 +26,11 @@ export function installRoutes(deps: AppDeps): Hono {
   const d = resolveDeps(deps);
   const app = new Hono();
 
-  app.get('/add/:slug', (c) => {
+  app.get('/add/:slug', async (c) => {
     const slug = c.req.param('slug');
-    const bot = d.repo.get(slug);
+    const bot = await d.repo.get(slug);
     if (!bot || bot.status !== 'published') return c.json({ error: 'not found' }, 404);
-    d.repo.recordEvent(slug, 'install', visitorHash(clientIp(c), d.salt, d.now()));
+    await d.repo.recordEvent(slug, 'install', visitorHash(clientIp(c), d.salt, d.now()));
     c.header('Cache-Control', 'no-store');
     if (bot.templateId) {
       return c.redirect(c.req.query('via') === 'web' ? templatePageUrl(bot.templateId) : templateDeepLink(bot.templateId), 302);
@@ -44,10 +44,10 @@ export function installRoutes(deps: AppDeps): Hono {
     }
   });
 
-  app.get('/badge/:file', (c) => {
+  app.get('/badge/:file', async (c) => {
     const file = c.req.param('file');
     if (!file.endsWith('.svg')) return c.json({ error: 'not found' }, 404);
-    const bot = d.repo.get(file.slice(0, -4));
+    const bot = await d.repo.get(file.slice(0, -4));
     if (!bot || bot.status !== 'published') return c.json({ error: 'not found' }, 404);
     return c.body(badgeSvg(), 200, {
       'Content-Type': 'image/svg+xml; charset=utf-8',

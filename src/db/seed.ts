@@ -8,8 +8,8 @@ export const DEFAULT_SEED_PATH = fileURLToPath(new URL('../../seed/catalog.json'
 
 const FEATURED_COUNT = 2;
 
-export function seedIfEmpty(repo: BotsRepo, catalogPath: string): { seeded: number } {
-  if (repo.count({ status: 'all' }) > 0) return { seeded: 0 };
+export async function seedIfEmpty(repo: BotsRepo, catalogPath: string): Promise<{ seeded: number }> {
+  if ((await repo.count({ status: 'all' })) > 0) return { seeded: 0 };
   let raw: unknown;
   try {
     raw = JSON.parse(readFileSync(catalogPath, 'utf8'));
@@ -20,8 +20,8 @@ export function seedIfEmpty(repo: BotsRepo, catalogPath: string): { seeded: numb
   if (!parsed.ok) {
     throw new Error(`Invalid seed catalog ${catalogPath}: ${parsed.errors.slice(0, 3).join('; ')}`);
   }
-  parsed.catalog.bots.forEach((cb, i) => {
-    repo.upsertFromCatalog({ ...catalogBotToNewBot(cb), featured: i < FEATURED_COUNT });
-  });
+  for (const [i, cb] of parsed.catalog.bots.entries()) {
+    await repo.upsertFromCatalog({ ...catalogBotToNewBot(cb), featured: i < FEATURED_COUNT });
+  }
   return { seeded: parsed.catalog.bots.length };
 }

@@ -62,11 +62,12 @@ export function pagesRoutes(deps: AppDeps): Hono {
   const siteName = config.siteName;
   const app = new Hono();
 
-  app.get('/', (c) => {
+  app.get('/', async (c) => {
     const origin = requestOrigin(c, config);
-    const featured = repo.list({ featured: true, limit: 6 });
-    const bots = repo.list({ limit: HOME_LIMIT });
-    const total = repo.count();
+    const featured = await repo.list({ featured: true, limit: 6 });
+    const bots = await repo.list({ limit: HOME_LIMIT });
+    const total = await repo.count();
+    const counts = await repo.categoryCounts();
     const lineup = [...featured, ...bots].filter((b, i, all) => all.findIndex((x) => x.slug === b.slug) === i).slice(0, 6);
     return sendPage(
       c,
@@ -86,7 +87,7 @@ export function pagesRoutes(deps: AppDeps): Hono {
           </div>
           <Lineup bots={lineup} />
         </section>
-        <CategoryChips counts={repo.categoryCounts()} active="all" />
+        <CategoryChips counts={counts} active="all" />
         {featured.length > 0 ? (
           <section class="shelf" aria-labelledby="featured-h">
             <h2 id="featured-h">Featured</h2>
@@ -117,8 +118,8 @@ export function pagesRoutes(deps: AppDeps): Hono {
     );
   });
 
-  app.get('/bots/:slug', (c) => {
-    const bot = repo.get(c.req.param('slug'));
+  app.get('/bots/:slug', async (c) => {
+    const bot = await repo.get(c.req.param('slug'));
     if (!bot || bot.status !== 'published') return sendPage(c, <NotFoundPage siteName={siteName} />, 404);
     const origin = requestOrigin(c, config);
     return sendPage(
@@ -135,13 +136,14 @@ export function pagesRoutes(deps: AppDeps): Hono {
     );
   });
 
-  app.get('/c/:category', (c) => {
+  app.get('/c/:category', async (c) => {
     const category = c.req.param('category');
     if (!isCategory(category)) return sendPage(c, <NotFoundPage siteName={siteName} />, 404);
     const origin = requestOrigin(c, config);
     const label = categoryLabel(category);
-    const bots = repo.list({ category, limit: 100 });
-    const total = repo.count({ category });
+    const bots = await repo.list({ category, limit: 100 });
+    const total = await repo.count({ category });
+    const counts = await repo.categoryCounts();
     return sendPage(
       c,
       <Layout
@@ -156,7 +158,7 @@ export function pagesRoutes(deps: AppDeps): Hono {
           <h1>{label}</h1>
           <p class="lede">{plural(total, 'bot')}</p>
         </section>
-        <CategoryChips counts={repo.categoryCounts()} active={category} />
+        <CategoryChips counts={counts} active={category} />
         <section class="shelf">
           {bots.length > 0 ? (
             <BotGrid bots={bots} />
@@ -176,10 +178,12 @@ export function pagesRoutes(deps: AppDeps): Hono {
     );
   });
 
-  app.get('/search', (c) => {
+  app.get('/search', async (c) => {
     const q = (c.req.query('q') ?? '').trim().slice(0, 200);
-    const bots = q ? repo.list({ q, limit: 100 }) : [];
-    const total = q ? repo.count({ q }) : 0;
+    const bots = q ? await repo.list({ q, limit: 100 }) : [];
+    const total = q ? await repo.count({ q }) : 0;
+    // Category chips show only when there is nothing to list: no query yet, or no match.
+    const chips = bots.length === 0 ? <CategoryChips counts={await repo.categoryCounts()} /> : null;
     return sendPage(
       c,
       <Layout title={q ? `Search: ${q}` : 'Search'} siteName={siteName} current="browse">
@@ -195,7 +199,7 @@ export function pagesRoutes(deps: AppDeps): Hono {
         {!q ? (
           <>
             <p class="lede">Search by name, tagline or tag, or browse a category.</p>
-            <CategoryChips counts={repo.categoryCounts()} />
+            {chips}
           </>
         ) : bots.length > 0 ? (
           <section class="shelf">
@@ -204,7 +208,7 @@ export function pagesRoutes(deps: AppDeps): Hono {
         ) : (
           <EmptyState title={`No bots match “${q}”`}>
             <p>Try a shorter word, or browse by category.</p>
-            <CategoryChips counts={repo.categoryCounts()} />
+            {chips}
           </EmptyState>
         )}
       </Layout>,

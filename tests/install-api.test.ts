@@ -4,7 +4,7 @@ import { loadConfig, type Config } from "../src/config.js";
 import { RateLimiter } from "../src/core/rate-limit.js";
 import { parseRecipe, type Recipe } from "../src/core/recipe.js";
 import { BotsRepo, type NewBot } from "../src/db/bots-repo.js";
-import { openDatabase } from "../src/db/database.js";
+import { openSqliteDatabase } from "../src/db/sqlite.js";
 import type { AppDeps } from "../src/deps.js";
 
 const ID = "AbCdEfGhIjKlMnOpQrStU";
@@ -52,12 +52,12 @@ const post = (body: unknown, headers: Record<string, string> = {}): RequestInit 
   body: JSON.stringify(body),
 });
 
-beforeEach(() => {
-  repo = new BotsRepo(openDatabase(":memory:"));
+beforeEach(async () => {
+  repo = new BotsRepo(await openSqliteDatabase(":memory:"));
   config = { ...loadConfig({ BOTMARKET_SITE_NAME: "Test Market" }), trustProxy: true, publicUrl: "https://market.example" };
-  repo.insert(mk("Release Notes Bot"));
-  repo.insert(mk("Recipe Bot", { templateId: null, recipe: recipe(), category: "sales" }));
-  repo.insert(mk("Pending Bot", { status: "pending" }));
+  await repo.insert(mk("Release Notes Bot"));
+  await repo.insert(mk("Recipe Bot", { templateId: null, recipe: recipe(), category: "sales" }));
+  await repo.insert(mk("Pending Bot", { status: "pending" }));
 });
 
 describe("GET /add/:slug", () => {
@@ -67,9 +67,9 @@ describe("GET /add/:slug", () => {
     expect(res.headers.get("location")).toBe(`grokbot://app/v1/bot-template?id=${ID}`);
     expect(res.headers.get("cache-control")).toBe("no-store");
     await app().request("/add/release-notes-bot", { headers: ip("1.1.1.1") });
-    expect(repo.get("release-notes-bot")?.installClicks).toBe(1);
+    expect((await repo.get("release-notes-bot"))?.installClicks).toBe(1);
     await app().request("/add/release-notes-bot", { headers: ip("2.2.2.2") });
-    expect(repo.get("release-notes-bot")?.installClicks).toBe(2);
+    expect((await repo.get("release-notes-bot"))?.installClicks).toBe(2);
   });
 
   it("?via=web goes to the x.ai page", async () => {
@@ -93,7 +93,7 @@ describe("GET /add/:slug", () => {
       expect(res.headers.get("location")).toBeNull();
       expect(await res.json()).toEqual({ error: "not found" });
     }
-    expect(repo.get("pending-bot")?.installClicks).toBe(0);
+    expect((await repo.get("pending-bot"))?.installClicks).toBe(0);
   });
 });
 
@@ -176,7 +176,7 @@ describe("POST /api/bots", () => {
     const res = await app({ config: { ...config, requireApproval: true } }).request("/api/bots", post({ ...base, templateRef: ID }));
     expect(res.status).toBe(201);
     expect(((await res.json()) as { status: string }).status).toBe("pending");
-    expect(repo.get("api-bot")?.status).toBe("pending");
+    expect((await repo.get("api-bot"))?.status).toBe("pending");
   });
   it("rejects with neither template nor recipe", async () => {
     const res = await app().request("/api/bots", post(base));
@@ -191,14 +191,14 @@ describe("POST /api/bots", () => {
     const res = await app().request("/api/bots", post({ ...base, templateRef: ID, descriptionMd: "x".repeat(7 * 1024 * 1024) }));
     expect(res.status).toBe(413);
     expect(await res.json()).toEqual({ error: "payload too large" });
-    expect(repo.get("api-bot")).toBeNull();
+    expect(await repo.get("api-bot")).toBeNull();
   });
   it("caps an object recipe at 2 MB", async () => {
     const big = { profile: { name: "Big" }, memory: ["m".repeat(3 * 1024 * 1024)] };
     const res = await app().request("/api/bots", post({ ...base, recipe: big }));
     expect(res.status).toBe(400);
     expect(((await res.json()) as { errors: string[] }).errors).toContain("recipe: must be at most 2 MB");
-    expect(repo.get("api-bot")).toBeNull();
+    expect(await repo.get("api-bot")).toBeNull();
   });
   it("rate limits", async () => {
     const a = app({ submitLimiter: new RateLimiter(1, 60000) });
@@ -243,7 +243,7 @@ describe("catalog and health", () => {
     expect(c.bots.map((b) => b.slug).sort()).toEqual(["recipe-bot", "release-notes-bot"]);
   });
   it("includes more than 100 bots", async () => {
-    for (let i = 0; i < 105; i++) repo.insert(mk(`Bulk ${i}`));
+    for (let i = 0; i < 105; i++) await repo.insert(mk(`Bulk ${i}`));
     const c = (await (await app().request("/catalog.json")).json()) as { bots: unknown[] };
     expect(c.bots).toHaveLength(107);
   });

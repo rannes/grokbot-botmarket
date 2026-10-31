@@ -4,7 +4,7 @@ import { loadConfig } from "../src/config.js";
 import { RateLimiter } from "../src/core/rate-limit.js";
 import { signAdminCookie } from "../src/core/admin-auth.js";
 import { BotsRepo, type NewBot } from "../src/db/bots-repo.js";
-import { openDatabase } from "../src/db/database.js";
+import { openSqliteDatabase } from "../src/db/sqlite.js";
 import { adminRoutes } from "../src/routes/admin.js";
 import { Hono } from "hono";
 
@@ -80,10 +80,10 @@ function catalog(n: number) {
 const fakeFetch = (body: string, ok = true) =>
   (async () => new Response(body, { status: ok ? 200 : 500 })) as unknown as typeof fetch;
 
-beforeEach(() => {
-  repo = new BotsRepo(openDatabase(":memory:"));
-  pendingSlug = repo.insert(mk("Pending Bot", { status: "pending" })).slug;
-  liveSlug = repo.insert(mk("Live Bot", { status: "published" })).slug;
+beforeEach(async () => {
+  repo = new BotsRepo(await openSqliteDatabase(":memory:"));
+  pendingSlug = (await repo.insert(mk("Pending Bot", { status: "pending" }))).slug;
+  liveSlug = (await repo.insert(mk("Live Bot", { status: "published" }))).slug;
 });
 
 describe("admin", () => {
@@ -171,21 +171,21 @@ describe("admin", () => {
   it("requires admin for actions", async () => {
     const res = await app().request(`/admin/bots/${pendingSlug}/approve`, post({}));
     expect(res.status).toBe(401);
-    expect(repo.get(pendingSlug)?.status).toBe("pending");
+    expect((await repo.get(pendingSlug))?.status).toBe("pending");
   });
 
   it("approves, features, unfeatures and deletes via Bearer", async () => {
     const a = app();
     let res = await a.request(`/admin/bots/${pendingSlug}/approve`, post(bearer));
     expect(res.status).toBe(303);
-    expect(repo.get(pendingSlug)?.status).toBe("published");
+    expect((await repo.get(pendingSlug))?.status).toBe("published");
     await a.request(`/admin/bots/${liveSlug}/feature`, post(bearer));
-    expect(repo.get(liveSlug)?.featured).toBe(true);
+    expect((await repo.get(liveSlug))?.featured).toBe(true);
     await a.request(`/admin/bots/${liveSlug}/unfeature`, post(bearer));
-    expect(repo.get(liveSlug)?.featured).toBe(false);
+    expect((await repo.get(liveSlug))?.featured).toBe(false);
     res = await a.request(`/admin/bots/${liveSlug}/delete`, post(bearer));
     expect(res.status).toBe(303);
-    expect(repo.get(liveSlug)).toBeNull();
+    expect(await repo.get(liveSlug)).toBeNull();
   });
 
   it("404s unknown slug", async () => {
@@ -200,8 +200,8 @@ describe("admin", () => {
     const html = await res.text();
     expect(html).toContain("Imported 2");
     expect(html).toContain("2 new");
-    expect(repo.get("imp-0")).not.toBeNull();
-    expect(repo.get("imp-1")).not.toBeNull();
+    expect(await repo.get("imp-0")).not.toBeNull();
+    expect(await repo.get("imp-1")).not.toBeNull();
     const again = await a.request("/admin/import", post(bearer, { url: "https://other.example/catalog.json" }));
     expect(await again.text()).toContain("2 updated");
   });
@@ -224,7 +224,7 @@ describe("admin", () => {
       post({ ...cookie(), origin: "https://evil.example" }),
     );
     expect(res2.status).toBe(403);
-    expect(repo.get(pendingSlug)?.status).toBe("pending");
+    expect((await repo.get(pendingSlug))?.status).toBe("pending");
   });
 
   it("redirects export to catalog.json", async () => {
@@ -240,7 +240,7 @@ describe("admin", () => {
     expect(forged.status).toBe(401);
     const wrong = await a.request(`/admin/bots/${pendingSlug}/approve`, post({ authorization: "Bearer nope" }));
     expect(wrong.status).toBe(401);
-    expect(repo.get(pendingSlug)?.status).toBe("pending");
+    expect((await repo.get(pendingSlug))?.status).toBe("pending");
   });
 
   it("refuses redirects and surfaces fetch errors on import", async () => {

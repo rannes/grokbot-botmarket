@@ -15,11 +15,12 @@ export async function startServer(
   config: Config,
   opts: { seedPath?: string; quiet?: boolean } = {},
 ): Promise<StartedServer> {
-  const db = openDatabase(config.dbPath);
+  const db = await openDatabase(config);
+  if (!opts.quiet) console.log(db.driver === 'postgres' ? 'Database: postgres' : `Database: sqlite (${config.dbPath})`);
   try {
     const repo = new BotsRepo(db);
     if (config.seed) {
-      const { seeded } = seedIfEmpty(repo, opts.seedPath ?? DEFAULT_SEED_PATH);
+      const { seeded } = await seedIfEmpty(repo, opts.seedPath ?? DEFAULT_SEED_PATH);
       if (seeded > 0 && !opts.quiet) console.log(`Seeded ${seeded} bots`);
     }
     const app = createApp({ repo, config });
@@ -31,8 +32,8 @@ export async function startServer(
           port: info.port,
           close: () =>
             new Promise<void>((res, rej) => {
-              server.close((err) => {
-                try { db.close(); } catch { /* already closed */ }
+              server.close(async (err) => {
+                try { await db.close(); } catch { /* already closed */ }
                 err ? rej(err) : res();
               });
               (server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
@@ -42,7 +43,7 @@ export async function startServer(
       server.once('error', reject);
     });
   } catch (e) {
-    try { db.close(); } catch { /* ignore */ }
+    try { await db.close(); } catch { /* ignore */ }
     throw e;
   }
 }

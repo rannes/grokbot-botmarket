@@ -10,8 +10,8 @@ beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'botmarket-srv-')); });
 afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
 const cfg = (port: number, seed = true): Config => ({
-  port, dataDir: dir, dbPath: join(dir, 'b.sqlite'), adminToken: null, requireApproval: false,
-  siteName: 'T', publicUrl: null, trustProxy: false, seed,
+  port, dataDir: dir, dbPath: join(dir, 'b.sqlite'), databaseDriver: 'sqlite', databaseUrl: null,
+  adminToken: null, requireApproval: false, siteName: 'T', publicUrl: null, trustProxy: false, seed,
 });
 
 describe('startServer', () => {

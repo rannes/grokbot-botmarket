@@ -19,12 +19,12 @@ function intParam(v: string | undefined, def: number, min: number, max: number):
 export function apiRoutes(deps: AppDeps): Hono {
   const d = resolveDeps(deps);
   const app = new Hono();
-  const published = (slug: string): Bot | null => {
-    const bot = d.repo.get(slug);
+  const published = async (slug: string): Promise<Bot | null> => {
+    const bot = await d.repo.get(slug);
     return bot && bot.status === 'published' ? bot : null;
   };
 
-  app.get('/api/bots', (c) => {
+  app.get('/api/bots', async (c) => {
     const { q, category, sort } = c.req.query();
     if (category !== undefined && category !== '' && !isCategory(category)) return c.json({ error: 'invalid category' }, 400);
     if (sort !== undefined && sort !== '' && !(SORTS as readonly string[]).includes(sort)) return c.json({ error: 'invalid sort' }, 400);
@@ -36,8 +36,8 @@ export function apiRoutes(deps: AppDeps): Hono {
       ...(category ? { category: category as never } : {}),
       ...(q ? { q } : {}),
     };
-    const bots = d.repo.list({ ...filter, sort: (sort || 'new') as Sort, limit, offset });
-    return c.json({ bots: bots.map(toCatalogBot), total: d.repo.count(filter) });
+    const bots = await d.repo.list({ ...filter, sort: (sort || 'new') as Sort, limit, offset });
+    return c.json({ bots: bots.map(toCatalogBot), total: await d.repo.count(filter) });
   });
 
   app.post('/api/bots', async (c) => {
@@ -50,34 +50,34 @@ export function apiRoutes(deps: AppDeps): Hono {
     }
     const parsed = botFromInput(body);
     if (!parsed.ok) return c.json({ errors: parsed.errors }, 400);
-    const bot = d.repo.insert({ ...parsed.bot, status: d.config.requireApproval ? 'pending' : 'published' });
+    const bot = await d.repo.insert({ ...parsed.bot, status: d.config.requireApproval ? 'pending' : 'published' });
     return c.json({ ...toCatalogBot(bot), status: bot.status }, 201, { Location: `/bots/${bot.slug}` });
   });
 
-  app.get('/api/bots/:slug/recipe.json', (c) => {
-    const bot = published(c.req.param('slug'));
+  app.get('/api/bots/:slug/recipe.json', async (c) => {
+    const bot = await published(c.req.param('slug'));
     if (!bot || !bot.recipe) return c.json({ error: 'not found' }, 404);
     return c.json(bot.recipe, 200, { 'Content-Disposition': `inline; filename="${bot.slug}.recipe.json"` });
   });
 
-  app.post('/api/bots/:slug/upvote', (c) => {
+  app.post('/api/bots/:slug/upvote', async (c) => {
     const slug = c.req.param('slug');
-    if (!published(slug)) return c.json({ error: 'not found' }, 404);
-    const counted = d.repo.recordEvent(slug, 'upvote', visitorHash(clientIp(c), d.salt, d.now()));
-    const fresh = d.repo.get(slug);
+    if (!(await published(slug))) return c.json({ error: 'not found' }, 404);
+    const counted = await d.repo.recordEvent(slug, 'upvote', visitorHash(clientIp(c), d.salt, d.now()));
+    const fresh = await d.repo.get(slug);
     return c.json({ upvotes: fresh?.upvotes ?? 0, counted });
   });
 
-  app.get('/api/bots/:slug', (c) => {
-    const bot = published(c.req.param('slug'));
+  app.get('/api/bots/:slug', async (c) => {
+    const bot = await published(c.req.param('slug'));
     if (!bot) return c.json({ error: 'not found' }, 404);
     return c.json(toCatalogBot(bot));
   });
 
-  app.get('/catalog.json', (c) => {
+  app.get('/catalog.json', async (c) => {
     const all: Bot[] = [];
     for (let offset = 0; ; offset += 100) {
-      const page = d.repo.list({ status: 'published', sort: 'new', limit: 100, offset });
+      const page = await d.repo.list({ status: 'published', sort: 'new', limit: 100, offset });
       all.push(...page);
       if (page.length < 100) break;
     }

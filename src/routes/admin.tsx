@@ -176,16 +176,18 @@ export function adminRoutes(deps: AppDeps, fetchImpl: typeof fetch = fetch): Hon
   }
 
   async function dashboard(c: Context, status: 200 | 400, extra: { notice?: string; errors?: string[] } = {}) {
-    const pending = d.repo.list({ status: 'pending', sort: 'new', limit: LIST_LIMIT });
-    const published = d.repo.list({ status: 'published', sort: 'new', limit: LIST_LIMIT });
+    const pending = await d.repo.list({ status: 'pending', sort: 'new', limit: LIST_LIMIT });
+    const published = await d.repo.list({ status: 'published', sort: 'new', limit: LIST_LIMIT });
+    const pendingCount = await d.repo.count({ status: 'pending' });
+    const publishedCount = await d.repo.count({ status: 'published' });
     return sendPage(
       c,
       <Dashboard
         siteName={siteName}
         pending={pending}
         published={published}
-        pendingCount={d.repo.count({ status: 'pending' })}
-        publishedCount={d.repo.count({ status: 'published' })}
+        pendingCount={pendingCount}
+        publishedCount={publishedCount}
         {...extra}
       />,
       status,
@@ -219,10 +221,10 @@ export function adminRoutes(deps: AppDeps, fetchImpl: typeof fetch = fetch): Hon
   app.get('/admin/export', (c) => c.redirect('/catalog.json', 302));
 
   /** Admin view of any bot, pending included, so a submission can be reviewed before approval. */
-  app.get('/admin/bots/:slug', (c) => {
+  app.get('/admin/bots/:slug', async (c) => {
     if (bearerLimited(c)) return c.json({ error: 'rate limited' }, 429);
     if (!isAdminRequest(c, d, d.salt)) return c.text('unauthorized', 401);
-    const bot = d.repo.get(c.req.param('slug'));
+    const bot = await d.repo.get(c.req.param('slug'));
     if (!bot) return sendPage(c, <NotFoundPage siteName={siteName} />, 404);
     return sendPage(
       c,
@@ -273,11 +275,11 @@ export function adminRoutes(deps: AppDeps, fetchImpl: typeof fetch = fetch): Hon
     if (!['approve', 'feature', 'unfeature', 'delete'].includes(action)) {
       return sendPage(c, <NotFoundPage siteName={siteName} />, 404);
     }
-    if (!d.repo.get(slug)) return sendPage(c, <NotFoundPage siteName={siteName} />, 404);
-    if (action === 'approve') d.repo.setStatus(slug, 'published');
-    else if (action === 'feature') d.repo.setFeatured(slug, true);
-    else if (action === 'unfeature') d.repo.setFeatured(slug, false);
-    else d.repo.delete(slug);
+    if (!(await d.repo.get(slug))) return sendPage(c, <NotFoundPage siteName={siteName} />, 404);
+    if (action === 'approve') await d.repo.setStatus(slug, 'published');
+    else if (action === 'feature') await d.repo.setFeatured(slug, true);
+    else if (action === 'unfeature') await d.repo.setFeatured(slug, false);
+    else await d.repo.delete(slug);
     return c.redirect('/admin', 303);
   });
 
@@ -327,9 +329,9 @@ export function adminRoutes(deps: AppDeps, fetchImpl: typeof fetch = fetch): Hon
     let created = 0;
     let updated = 0;
     for (const cb of parsed.catalog.bots) {
-      if (d.repo.get(cb.slug)) updated++;
+      if (await d.repo.get(cb.slug)) updated++;
       else created++;
-      d.repo.upsertFromCatalog(catalogBotToNewBot(cb));
+      await d.repo.upsertFromCatalog(catalogBotToNewBot(cb));
     }
     const n = created + updated;
     return dashboard(c, 200, {

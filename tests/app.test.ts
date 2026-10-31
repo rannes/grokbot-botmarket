@@ -4,7 +4,7 @@ import { loadConfig, type Config } from "../src/config.js";
 import { RateLimiter } from "../src/core/rate-limit.js";
 import { parseRecipe, type Recipe } from "../src/core/recipe.js";
 import { BotsRepo, type NewBot } from "../src/db/bots-repo.js";
-import { openDatabase } from "../src/db/database.js";
+import { openSqliteDatabase } from "../src/db/sqlite.js";
 import type { AppDeps } from "../src/deps.js";
 
 const ID = "AbCdEfGhIjKlMnOpQrStU";
@@ -69,10 +69,10 @@ const validSubmission = {
   avatarColor: "",
 };
 
-beforeEach(() => {
-  repo = new BotsRepo(openDatabase(":memory:"));
+beforeEach(async () => {
+  repo = new BotsRepo(await openSqliteDatabase(":memory:"));
   config = { ...loadConfig({ BOTMARKET_SITE_NAME: "Test Market" }), publicUrl: "https://market.example" };
-  repo.insert(mk("Release Notes Bot", { featured: true }));
+  await repo.insert(mk("Release Notes Bot", { featured: true }));
 });
 
 describe("security and static", () => {
@@ -120,7 +120,7 @@ describe("security and static", () => {
   });
 
   it("never emits inline style or event handler attributes", async () => {
-    repo.insert(mk("Recipe Bot", { templateId: null, recipe: recipe() }));
+    await repo.insert(mk("Recipe Bot", { templateId: null, recipe: recipe() }));
     for (const path of ["/", "/bots/release-notes-bot", "/bots/recipe-bot", "/submit", "/c/engineering", "/search?q=x"]) {
       const html = await (await app().request(path)).text();
       expect(html, path).not.toMatch(/\sstyle=/);
@@ -132,7 +132,7 @@ describe("security and static", () => {
 
 describe("home", () => {
   it("lists published bots with site name, featured row and add links", async () => {
-    repo.insert(mk("Hidden Pending Bot", { status: "pending" }));
+    await repo.insert(mk("Hidden Pending Bot", { status: "pending" }));
     const res = await app().request("/");
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/html");
@@ -151,7 +151,7 @@ describe("home", () => {
   });
 
   it("shows an empty state with no bots", async () => {
-    repo = new BotsRepo(openDatabase(":memory:"));
+    repo = new BotsRepo(await openSqliteDatabase(":memory:"));
     const html = await (await app().request("/")).text();
     expect(html).toContain('href="/submit"');
     expect(html).toContain("No bots yet");
@@ -162,7 +162,7 @@ describe("home", () => {
 
 describe("bot detail", () => {
   it("shows template install buttons and og tags", async () => {
-    repo.update("release-notes-bot", { imageUrl: "https://img.example/a.png" });
+    await repo.update("release-notes-bot", { imageUrl: "https://img.example/a.png" });
     const res = await app().request("/bots/release-notes-bot");
     expect(res.status).toBe(200);
     const html = await res.text();
@@ -194,13 +194,13 @@ describe("bot detail", () => {
   });
 
   it("404s for unknown and pending bots", async () => {
-    repo.insert(mk("Pending Bot", { status: "pending" }));
+    await repo.insert(mk("Pending Bot", { status: "pending" }));
     expect((await app().request("/bots/nope")).status).toBe(404);
     expect((await app().request("/bots/pending-bot")).status).toBe(404);
   });
 
   it("shows recipe install options and recipe contents", async () => {
-    repo.insert(mk("Recipe Bot", { templateId: null, recipe: recipe() }));
+    await repo.insert(mk("Recipe Bot", { templateId: null, recipe: recipe() }));
     const html = await (await app().request("/bots/recipe-bot")).text();
     expect(html).toContain("Create in Grok Bot");
     expect(html).toContain('href="/add/recipe-bot"');
@@ -218,7 +218,7 @@ describe("bot detail", () => {
   });
 
   it("escapes user-provided text", async () => {
-    repo.insert(mk("<script>alert(1)</script>", { slug: "xss", tagline: '"><img src=x>' }));
+    await repo.insert(mk("<script>alert(1)</script>", { slug: "xss", tagline: '"><img src=x>' }));
     const html = await (await app().request("/bots/xss")).text();
     expect(html).not.toContain("<script>alert(1)</script>");
     expect(html).not.toContain('"><img src=x>');
@@ -248,7 +248,7 @@ describe("bot detail", () => {
 
 describe("category and search", () => {
   it("filters by category and 404s unknown categories", async () => {
-    repo.insert(mk("Lead Finder", { category: "sales" }));
+    await repo.insert(mk("Lead Finder", { category: "sales" }));
     const res = await app().request("/c/sales");
     expect(res.status).toBe(200);
     const html = await res.text();
@@ -258,7 +258,7 @@ describe("category and search", () => {
   });
 
   it("searches and shows a count or an empty state", async () => {
-    repo.insert(mk("Lead Finder", { category: "sales", tags: ["crm"] }));
+    await repo.insert(mk("Lead Finder", { category: "sales", tags: ["crm"] }));
     const html = await (await app().request("/search?q=lead")).text();
     expect(html).toContain("Lead Finder");
     expect(html).not.toContain("Release Notes Bot");
@@ -414,7 +414,7 @@ describe("submit", () => {
     const res = await app().request("/submit", form(validSubmission));
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("/bots/sales-scout");
-    const bot = repo.get("sales-scout");
+    const bot = await repo.get("sales-scout");
     expect(bot?.status).toBe("published");
     expect(bot?.templateId).toBe(ID);
     expect(bot?.tags).toEqual(["leads", "prospecting"]);
@@ -432,7 +432,7 @@ describe("submit", () => {
       form({ ...validSubmission, ref: "", name: "Recipe Only", recipeText: JSON.stringify(recipe()) }),
     );
     expect(res.status).toBe(303);
-    const bot = repo.get("recipe-only");
+    const bot = await repo.get("recipe-only");
     expect(bot?.templateId).toBeNull();
     expect(bot?.recipe?.skills[0]?.name).toBe("summarize-week");
     expect(bot?.avatarShape).toBe("capsule");
@@ -444,7 +444,7 @@ describe("submit", () => {
     const html = await res.text();
     expect(html).toContain("Category: must be one of");
     expect(html).toContain('value="Sales Scout"');
-    expect(repo.get("sales-scout")).toBeNull();
+    expect(await repo.get("sales-scout")).toBeNull();
   });
 
   it("holds submissions for approval when required", async () => {
@@ -452,7 +452,7 @@ describe("submit", () => {
     const res = await app().request("/submit", form(validSubmission));
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("/submitted");
-    expect(repo.get("sales-scout")?.status).toBe("pending");
+    expect((await repo.get("sales-scout"))?.status).toBe("pending");
     const page = await app().request("/submitted");
     expect(page.status).toBe(200);
     expect(await page.text()).toContain("approv");
@@ -470,7 +470,7 @@ describe("submit", () => {
     expect(limited).toContain("Too many submissions");
     expect(limited).toContain('value="Another"');
     expect(limited).toContain('<form class="submit-form"');
-    expect(repo.get("another")).toBeNull();
+    expect(await repo.get("another")).toBeNull();
     const other = await a.request("/submit", {
       ...form({ ...validSubmission, name: "Third" }),
       headers: { "x-forwarded-for": "198.51.100.1" },

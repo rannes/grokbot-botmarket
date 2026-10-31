@@ -373,7 +373,7 @@ export function submitRoutes(deps: AppDeps): Hono {
     const result = botFromInput({ ...rest, templateRef: ref });
     if (!result.ok) return form(c, { values, errors: result.errors }, 400);
     const status = config.requireApproval ? 'pending' : 'published';
-    const bot = repo.insert({ ...result.bot, slug: slugify(result.bot.name), status });
+    const bot = await repo.insert({ ...result.bot, slug: slugify(result.bot.name), status });
     return c.redirect(status === 'published' ? botPath(bot.slug) : '/submitted', 303);
   });
 

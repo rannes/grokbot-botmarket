@@ -46,6 +46,12 @@ describe('runCli', () => {
     expect(t.out.join('')).toContain('Usage');
   });
 
+  it('help lists the database URL variables', async () => {
+    const t = io();
+    expect(await runCli(['help'], t.io)).toBe(0);
+    expect(t.out.join('')).toContain('BOTMARKET_DATABASE_URL, DATABASE_URL');
+  });
+
   it('import then export round-trips the seed catalog', async () => {
     const env = { BOTMARKET_DATA_DIR: join(dir, 'data') };
     const a = io(env);

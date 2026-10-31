@@ -24,7 +24,7 @@ Commands:
   help, --help, -h       Show this help
 
 Environment: PORT, HOST, BOTMARKET_DATA_DIR, BOTMARKET_ADMIN_TOKEN, BOTMARKET_REQUIRE_APPROVAL,
-BOTMARKET_SITE_NAME, BOTMARKET_PUBLIC_URL, BOTMARKET_SEED
+BOTMARKET_SITE_NAME, BOTMARKET_PUBLIC_URL, BOTMARKET_SEED, BOTMARKET_DATABASE_URL, DATABASE_URL
 `;
 
 const MAX_IMPORT_BYTES = 8 * 1024 * 1024;
@@ -78,27 +78,27 @@ export async function runCli(argv: string[], io: CliIO): Promise<number> {
           io.stderr(`import: invalid catalog:\n${parsed.errors.map((e) => `  ${e}`).join('\n')}\n`);
           return 1;
         }
-        const db = openDatabase(loadConfig(io.env).dbPath);
+        const db = await openDatabase(loadConfig(io.env));
         try {
           const repo = new BotsRepo(db);
-          for (const cb of parsed.catalog.bots) repo.upsertFromCatalog(catalogBotToNewBot(cb));
-        } finally { db.close(); }
+          for (const cb of parsed.catalog.bots) await repo.upsertFromCatalog(catalogBotToNewBot(cb));
+        } finally { await db.close(); }
         io.stdout(`Imported ${parsed.catalog.bots.length} bots\n`);
         return 0;
       }
 
       case 'export': {
         const config = loadConfig(io.env);
-        const db = openDatabase(config.dbPath);
+        const db = await openDatabase(config);
         let bots: Bot[] = [];
         try {
           const repo = new BotsRepo(db);
           for (let offset = 0; ; offset += 100) {
-            const page = repo.list({ status: 'published', limit: 100, offset });
+            const page = await repo.list({ status: 'published', limit: 100, offset });
             bots.push(...page);
             if (page.length < 100) break;
           }
-        } finally { db.close(); }
+        } finally { await db.close(); }
         const text = JSON.stringify(exportCatalog(bots, { name: config.siteName, url: config.publicUrl }), null, 2) + '\n';
         if (rest[0]) {
           writeFileSync(rest[0], text);
