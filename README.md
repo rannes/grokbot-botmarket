@@ -64,7 +64,7 @@ By default (`BOTMARKET_SEED=true`) an empty database is seeded with 10 example b
 
 ## Database
 
-By default BotMarket stores everything in a single SQLite file, `botmarket.db` inside `BOTMARKET_DATA_DIR` (`./data`, or `/data` in Docker). No setup is needed.
+By default BotMarket stores everything in a single SQLite file, `botmarket.sqlite` inside `BOTMARKET_DATA_DIR` (`./data`, or `/data` in Docker). No setup is needed.
 
 To use PostgreSQL instead, set `DATABASE_URL` (or `BOTMARKET_DATABASE_URL`, which takes precedence if both are set). A blank value counts as unset.
 
