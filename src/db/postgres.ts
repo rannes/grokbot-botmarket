@@ -15,6 +15,16 @@ export function rewritePlaceholders(sql: string): string {
   return sql.replace(/\?/g, () => `$${++n}`);
 }
 
+/**
+ * A one-line reason for a failed connection. Connecting to a name with several addresses (localhost
+ * is ::1 and 127.0.0.1) fails with an AggregateError whose own message is empty: use the inner ones.
+ */
+function connectFailureReason(e: unknown): string {
+  if (e instanceof AggregateError && e.errors.length > 0) return e.errors.map(connectFailureReason).join("; ");
+  if (!(e instanceof Error)) return String(e);
+  return e.message || (e as NodeJS.ErrnoException).code || e.name;
+}
+
 /** What the executor needs from a pool or a checked-out client. */
 interface Queryable {
   query<R extends pg.QueryResultRow>(text: string, values?: SqlValue[]): Promise<pg.QueryResult<R>>;
@@ -112,7 +122,7 @@ export async function openPostgresDatabase(url: string, opts: { schema?: string 
     try {
       await db.ping();
     } catch (e) {
-      throw new Error(`Cannot connect to Postgres: ${(e as Error).message}`);
+      throw new Error(`Cannot connect to Postgres: ${connectFailureReason(e)}`);
     }
     if (schema) await db.exec(`CREATE SCHEMA IF NOT EXISTS ${schema}`);
     await migrate(db);

@@ -22,6 +22,14 @@ describe("openPostgresDatabase", () => {
       expect(e.message).not.toContain("hunter2");
     });
   });
+  it("gives a reason when every address of localhost refuses", async () => {
+    const e = await openPostgresDatabase("postgres://user:hunter2@localhost:1/db").then(
+      () => new Error("connected"),
+      (err: Error) => err,
+    );
+    expect(e.message).toMatch(/^Cannot connect to Postgres: \S/);
+    expect(e.message).not.toContain("hunter2");
+  });
 });
 
 const url = process.env.BOTMARKET_TEST_DATABASE_URL;
